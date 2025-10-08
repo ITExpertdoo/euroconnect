@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../utils/api';
 import { toast } from 'sonner@2.0.3';
 import { ChangePasswordSection } from './ChangePasswordSection';
+import { ApplyToJobModal } from './ApplyToJobModal';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -30,7 +31,9 @@ import {
   Home,
   Menu,
   X,
-  Shield
+  Shield,
+  Briefcase,
+  Search
 } from 'lucide-react';
 
 interface CandidateDashboardProps {
@@ -43,6 +46,11 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [documents, setDocuments] = useState([
     { name: 'CV/Biografija', uploaded: false, file: null as File | null },
     { name: 'Diploma/Svjedočanstvo', uploaded: false, file: null as File | null },
@@ -61,10 +69,20 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
   useEffect(() => {
     if (isAuthenticated) {
       loadApplications();
+      loadJobs();
     } else {
       setLoading(false);
     }
   }, [isAuthenticated]);
+
+  const loadJobs = async () => {
+    setLoadingJobs(true);
+    const response = await api.getJobs();
+    if (response.success) {
+      setJobs(response.data || []);
+    }
+    setLoadingJobs(false);
+  };
 
   const loadApplications = async () => {
     if (!isAuthenticated) {
@@ -134,6 +152,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
 
   const sidebarItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'browse-jobs', icon: Briefcase, label: 'Pretraži Poslove' },
     { id: 'applications', icon: FileText, label: 'My Applications', count: applications.length },
     { id: 'saved', icon: Bookmark, label: 'Saved Jobs', count: 0 },
     { id: 'messages', icon: MessageSquare, label: 'Messages', count: 0 },
@@ -159,10 +178,86 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
     return Math.round((uploaded / documents.length) * 100);
   };
 
+  const renderBrowseJobs = () => {
+    const filteredJobs = jobs.filter(job => 
+      job.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.location?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return (
+      <div>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Pretraži poslove po nazivu, kompaniji ili lokaciji..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {loadingJobs ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+            <p className="mt-2 text-gray-600">Učitavanje poslova...</p>
+          </div>
+        ) : filteredJobs.length === 0 ? (
+          <div className="text-center py-12 text-gray-600">
+            <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>Nema pronađenih poslova</p>
+            {searchQuery && <p className="text-sm mt-2">Pokušajte sa drugom pretragom</p>}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredJobs.map((job) => (
+              <Card key={job.id} className={`hover:shadow-lg transition-shadow ${job.isPremium ? 'border-2 border-gold/50' : ''}`}>
+                <CardHeader>
+                  <div className="flex justify-between items-start gap-2">
+                    <CardTitle className="text-lg">{job.title}</CardTitle>
+                    <div className="flex flex-col gap-1">
+                      {job.isPremium && <Badge className="bg-gold text-gold-foreground whitespace-nowrap"><Crown className="w-3 h-3 mr-1" />Premium</Badge>}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600 mb-2">{job.company}</p>
+                  <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    {job.location}
+                  </p>
+                  <p className="font-semibold text-primary mb-3 flex items-center gap-1">
+                    <Euro className="w-4 h-4" />
+                    {job.salary}
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setSelectedJob(job);
+                      setApplyModalOpen(true);
+                    }}
+                    className="w-full bg-gold text-gold-foreground hover:bg-gold/90"
+                  >
+                    Apliciraj
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case 'dashboard':
         return renderDashboard();
+      case 'browse-jobs':
+        return renderBrowseJobs();
       case 'applications':
         return renderApplications();
       case 'saved':
@@ -839,6 +934,20 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
           {renderContent()}
         </div>
       </div>
+
+      {/* Apply to Job Modal */}
+      <ApplyToJobModal
+        open={applyModalOpen}
+        onClose={() => {
+          setApplyModalOpen(false);
+          setSelectedJob(null);
+        }}
+        job={selectedJob}
+        onSuccess={() => {
+          loadApplications();
+          loadJobs();
+        }}
+      />
     </div>
   );
 }

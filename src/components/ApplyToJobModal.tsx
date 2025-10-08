@@ -28,6 +28,45 @@ export function ApplyToJobModal({ open, onClose, job, onSuccess }: ApplyToJobMod
   const [coverLetter, setCoverLetter] = useState('');
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [uploadingCv, setUploadingCv] = useState(false);
+  const [checkingDocuments, setCheckingDocuments] = useState(false);
+  const [hasAllDocuments, setHasAllDocuments] = useState(false);
+  const [missingDocuments, setMissingDocuments] = useState<string[]>([]);
+
+  // Required document types
+  const requiredDocuments = [
+    'CV/Biografija',
+    'Diploma/Svjedočanstvo',
+    'Fotografija za pasoš',
+    'Kopija pasoša',
+    'Medicinska potvrda',
+    'Potvrda o nekažnjavanju'
+  ];
+
+  // Check if user has all required documents when modal opens
+  React.useEffect(() => {
+    if (open && isAuthenticated && user?.role === 'candidate') {
+      checkUserDocuments();
+    }
+  }, [open, isAuthenticated, user]);
+
+  const checkUserDocuments = async () => {
+    setCheckingDocuments(true);
+    try {
+      const response = await api.getMyDocuments();
+      if (response.success && response.data) {
+        const approvedDocs = response.data.filter((doc: any) => doc.status === 'approved');
+        const approvedTypes = approvedDocs.map((doc: any) => doc.documentType);
+        
+        const missing = requiredDocuments.filter(type => !approvedTypes.includes(type));
+        setMissingDocuments(missing);
+        setHasAllDocuments(missing.length === 0);
+      }
+    } catch (error) {
+      console.error('Error checking documents:', error);
+    } finally {
+      setCheckingDocuments(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,6 +98,11 @@ export function ApplyToJobModal({ open, onClose, job, onSuccess }: ApplyToJobMod
 
     if (user?.role !== 'candidate') {
       toast.error('Samo kandidati mogu aplicirati za poslove');
+      return;
+    }
+
+    if (!hasAllDocuments) {
+      toast.error('Morate imati sva odobrena dokumenta pre apliciranja na posao');
       return;
     }
 
@@ -122,12 +166,43 @@ export function ApplyToJobModal({ open, onClose, job, onSuccess }: ApplyToJobMod
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleApply} className="space-y-4">
-          <div>
-            <Label htmlFor="cv-upload">
-              CV / Resume * 
-              <span className="text-xs text-gray-500 ml-2">(PDF ili Word, max 5MB)</span>
-            </Label>
+        {checkingDocuments ? (
+          <div className="py-8 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <p className="text-sm text-gray-500 mt-2">Provera dokumenata...</p>
+          </div>
+        ) : !hasAllDocuments ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="font-semibold text-red-900 mb-2">⚠️ Nedostaju dokumenta</h4>
+            <p className="text-sm text-red-700 mb-3">
+              Morate imati sva odobrena dokumenta da biste aplicirali za posao.
+            </p>
+            <div className="text-sm text-red-800">
+              <p className="font-medium mb-1">Potrebna dokumenta koja nedostaju:</p>
+              <ul className="list-disc list-inside space-y-1">
+                {missingDocuments.map((doc, index) => (
+                  <li key={index}>{doc}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="w-full"
+              >
+                Zatvori
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleApply} className="space-y-4">
+            <div>
+              <Label htmlFor="cv-upload">
+                CV / Resume * 
+                <span className="text-xs text-gray-500 ml-2">(PDF ili Word, max 5MB)</span>
+              </Label>
             <div className="mt-2">
               <Input
                 id="cv-upload"
@@ -191,7 +266,8 @@ export function ApplyToJobModal({ open, onClose, job, onSuccess }: ApplyToJobMod
               )}
             </Button>
           </div>
-        </form>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -296,6 +296,23 @@ class ApiClient {
       body: JSON.stringify({ toEmail }),
     });
   }
+
+  // Pricing Configuration (Admin only)
+  async getPricingConfig() {
+    return this.request('/pricing-config', { method: 'GET' });
+  }
+
+  async updatePricingConfig(config: any) {
+    return this.request('/pricing-config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  // Document endpoints
+  async getMyDocuments() {
+    return this.request('/my-documents', { method: 'GET' });
+  }
 }
 
 export const api = new ApiClient();

@@ -528,15 +528,52 @@ app.post("/make-server-fe64975a/applications", verifyAuth, async (c) => {
       return c.json({ error: 'Only candidates can apply to jobs' }, 403);
     }
     
+    // Check if candidate has all required documents approved
+    const allDocuments = await kv.getByPrefix(`document:${userId}:`);
+    const requiredDocTypes = [
+      'cv',
+      'diploma',
+      'passport-photo',
+      'passport-copy',
+      'medical-certificate',
+      'police-clearance'
+    ];
+    
+    const approvedDocs = allDocuments.filter((doc: any) => doc.status === 'approved');
+    const approvedDocTypes = approvedDocs.map((doc: any) => doc.documentType);
+    const hasAllDocs = requiredDocTypes.every(type => approvedDocTypes.includes(type));
+    
+    if (!hasAllDocs) {
+      return c.json({ 
+        error: 'Morate imati sva odobrena dokumenta pre prijave na oglas',
+        missingDocs: requiredDocTypes.filter(type => !approvedDocTypes.includes(type))
+      }, 400);
+    }
+    
     const { jobId, coverLetter, cvUrl } = await c.req.json();
     
-    if (!jobId || !cvUrl) {
+    if (!jobId) {
       return c.json({ error: 'Missing required fields' }, 400);
     }
     
     const job = await kv.get(`job:${jobId}`);
     if (!job) {
       return c.json({ error: 'Job not found' }, 404);
+    }
+    
+    // Check if job is premium and user has premium access
+    if (job.isPremium && !user.isPremium && !user.isAdmin) {
+      return c.json({ error: 'Premium pristup je potreban za ovaj oglas' }, 403);
+    }
+    
+    // Check if already applied
+    const existingApplications = await kv.getByPrefix('application:');
+    const alreadyApplied = existingApplications.some((app: any) => 
+      app.candidateId === userId && app.jobId === jobId
+    );
+    
+    if (alreadyApplied) {
+      return c.json({ error: 'Već ste aplicirali za ovaj oglas' }, 400);
     }
     
     const applicationId = crypto.randomUUID();
@@ -546,8 +583,8 @@ app.post("/make-server-fe64975a/applications", verifyAuth, async (c) => {
       candidateId: userId,
       candidateName: user.name,
       candidateEmail: user.email,
-      coverLetter,
-      cvUrl,
+      coverLetter: coverLetter || '',
+      cvUrl: cvUrl || '',
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
@@ -1698,6 +1735,136 @@ app.post("/make-server-fe64975a/admin/documents/:documentId/reject", verifyAuth,
   } catch (error) {
     console.error('Reject document error:', error);
     return c.json({ error: 'Failed to reject document' }, 500);
+  }
+});
+
+// ==================== PRICING CONFIG ROUTES ====================
+
+// Get pricing config
+app.get("/make-server-fe64975a/pricing-config", async (c) => {
+  try {
+    let config = await kv.get('pricing:config');
+    
+    // If no config exists, create default
+    if (!config) {
+      config = {
+        candidateBasic: 9.99,
+        candidateProfessional: 29.99,
+        candidateEnterprise: 99.99,
+        employerBoost: 19.99,
+        employerHighlight: 29.99,
+        employerFeatured: 49.99,
+      };
+      await kv.set('pricing:config', config);
+    }
+    
+    return c.json(config);
+  } catch (error) {
+    console.error('Get pricing config error:', error);
+    return c.json({ error: 'Failed to get pricing config' }, 500);
+  }
+});
+
+// Update pricing config (admin only)
+app.put("/make-server-fe64975a/pricing-config", verifyAuth, async (c) => {
+  try {
+    const userId = c.get('userId');
+    const user = await kv.get(`user:${userId}`);
+    
+    if (!user?.isAdmin) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+    
+    const config = await c.req.json();
+    await kv.set('pricing:config', config);
+    
+    return c.json({ success: true, config });
+  } catch (error) {
+    console.error('Update pricing config error:', error);
+    return c.json({ error: 'Failed to update pricing config' }, 500);
+  }
+});
+
+// ==================== PRICING CONFIG ROUTES (Admin only) ====================
+
+// Get pricing configuration
+app.get("/make-server-fe64975a/pricing-config", verifyAuth, async (c) => {
+  try {
+    const userId = c.get('userId');
+    const user = await kv.get(`user:${userId}`);
+    
+    if (!user?.isAdmin) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+    
+    let config = await kv.get('pricing-config');
+    
+    // Return default config if none exists
+    if (!config) {
+      config = {
+        candidateBasic: 9.99,
+        candidateProfessional: 29.99,
+        candidateEnterprise: 99.99,
+        employerBoost: 19.99,
+        employerHighlight: 29.99,
+        employerFeatured: 49.99,
+      };
+    }
+    
+    return c.json(config);
+  } catch (error) {
+    console.error('Get pricing config error:', error);
+    return c.json({ error: 'Failed to get pricing config' }, 500);
+  }
+});
+
+// Update pricing configuration
+app.post("/make-server-fe64975a/pricing-config", verifyAuth, async (c) => {
+  try {
+    const userId = c.get('userId');
+    const user = await kv.get(`user:${userId}`);
+    
+    if (!user?.isAdmin) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+    
+    const config = await c.req.json();
+    
+    // Validate that all prices are positive numbers
+    const prices = [
+      config.candidateBasic,
+      config.candidateProfessional,
+      config.candidateEnterprise,
+      config.employerBoost,
+      config.employerHighlight,
+      config.employerFeatured,
+    ];
+    
+    if (prices.some(p => typeof p !== 'number' || p <= 0)) {
+      return c.json({ error: 'All prices must be positive numbers' }, 400);
+    }
+    
+    await kv.set('pricing-config', config);
+    
+    return c.json({ success: true, config });
+  } catch (error) {
+    console.error('Update pricing config error:', error);
+    return c.json({ error: 'Failed to update pricing config' }, 500);
+  }
+});
+
+// Get user documents (for checking if candidate has all documents)
+app.get("/make-server-fe64975a/my-documents", verifyAuth, async (c) => {
+  try {
+    const userId = c.get('userId');
+    const allDocuments = await kv.getByPrefix('document:');
+    
+    const userDocuments = allDocuments.filter((doc: any) => doc.userId === userId);
+    
+    return c.json(userDocuments);
+  } catch (error) {
+    console.error('Get my documents error:', error);
+    return c.json({ error: 'Failed to get documents' }, 500);
   }
 });
 

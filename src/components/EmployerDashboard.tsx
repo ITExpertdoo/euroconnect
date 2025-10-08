@@ -50,7 +50,7 @@ interface EmployerDashboardProps {
 }
 
 export function EmployerDashboard({ onNavigate }: EmployerDashboardProps = {}) {
-  const { user, isAuthenticated, logout, isAdmin } = useAuth();
+  const { user, isAuthenticated, logout, isAdmin, isPremium } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [jobs, setJobs] = useState<any[]>([]);

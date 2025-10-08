@@ -28,6 +28,7 @@ import { createJobsForEmployers } from '../utils/seedDemoData';
 import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { EmailConfigSection } from './EmailConfigSection';
+import { PricingConfigModal } from './PricingConfigModal';
 
 interface AdminPanelProps {
   onNavigate?: (page: string) => void;
@@ -40,6 +41,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
   
   // Email settings state
   const [emailConfig, setEmailConfig] = useState<any>(null);
@@ -409,11 +411,22 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
             Nazad
           </Button>
           
-          <div className="flex items-center gap-3">
-            <Crown className="w-8 h-8 text-gold" />
-            <h1 className="text-3xl font-bold">Admin Panel</h1>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <Crown className="w-8 h-8 text-gold" />
+                <h1 className="text-3xl font-bold">Admin Panel</h1>
+              </div>
+              <p className="text-white/80 mt-2">Upravljanje sistemom EuroConnect</p>
+            </div>
+            <Button 
+              onClick={() => setPricingModalOpen(true)}
+              className="bg-gold text-gold-foreground hover:bg-gold/90"
+            >
+              <DollarSign className="w-4 h-4 mr-2" />
+              Upravljaj Cenovnikom
+            </Button>
           </div>
-          <p className="text-white/80 mt-2">Upravljanje sistemom EuroConnect</p>
         </div>
       </div>
 
@@ -475,10 +488,11 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-4xl">
             <TabsTrigger value="users">Korisnici</TabsTrigger>
             <TabsTrigger value="applications">Aplikacije</TabsTrigger>
             <TabsTrigger value="payments">Plaćanja</TabsTrigger>
+            <TabsTrigger value="pricing">Cenovnik</TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="w-4 h-4 mr-2" />
               Podešavanja
@@ -863,8 +877,73 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
               />
             </div>
           </TabsContent>
+
+          {/* Pricing Configuration Tab */}
+          <TabsContent value="pricing">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-6 h-6 text-primary" />
+                  Upravljanje Cenovnikom
+                </CardTitle>
+                <p className="text-sm text-gray-600">
+                  Konfiguriši cene za premium planove kandidata i nadogradnje oglasa poslodavaca
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-900">
+                      <strong>Napomena:</strong> Cene se primenjuju na sve nove kupovine. 
+                      Postojeći korisnici zadržavaju cene po kojima su kupili premium.
+                    </p>
+                  </div>
+
+                  <Button 
+                    onClick={() => setPricingModalOpen(true)}
+                    className="w-full md:w-auto"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Uredi Cenovnik
+                  </Button>
+
+                  <div className="grid md:grid-cols-2 gap-6 mt-6">
+                    <div>
+                      <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
+                        <Crown className="w-5 h-5 text-gold" />
+                        Premium za Kandidate
+                      </h4>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <p>• Basic: Pristup premium oglasima 1 mesec</p>
+                        <p>• Professional: Pristup premium oglasima 3 meseca</p>
+                        <p>• Enterprise: Pristup premium oglasima 12 meseci</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-secondary" />
+                        Nadogradnje za Poslodavce
+                      </h4>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <p>• Boost: Povećana vidljivost 7 dana</p>
+                        <p>• Highlight: Zlatni okvir 30 dana</p>
+                        <p>• Featured: Premium oznaka + top pozicija 30 dana</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Pricing Modal */}
+      <PricingConfigModal 
+        open={pricingModalOpen}
+        onClose={() => setPricingModalOpen(false)}
+      />
     </div>
   );
 }
