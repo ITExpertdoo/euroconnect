@@ -18,7 +18,6 @@ import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner@2.0.3';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DebugPanel } from './components/DebugPanel';
 
 function AppContent() {
   const { user, isAuthenticated, loading, isAdmin } = useAuth();
@@ -170,7 +169,6 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-white">
       <Toaster />
-      <DebugPanel />
       {renderCurrentPage()}
       
       {resetToken && showResetModal && (

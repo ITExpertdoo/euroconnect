@@ -95,7 +95,6 @@
     --color-yellow-600: oklch(.681 .162 75.834);
     --color-yellow-700: oklch(.554 .135 66.442);
     --color-yellow-800: oklch(.476 .114 61.907);
-    --color-yellow-900: oklch(.421 .095 57.708);
     --color-green-50: oklch(.982 .018 155.826);
     --color-green-100: oklch(.962 .044 156.743);
     --color-green-200: oklch(.925 .084 155.995);
@@ -617,10 +616,6 @@
 
   .z-50 {
     z-index: 50;
-  }
-
-  .z-\[9999\] {
-    z-index: 9999;
   }
 
   .col-start-2 {
@@ -1325,16 +1320,6 @@
     border-radius: var(--radius-xs);
   }
 
-  .rounded-t-lg {
-    border-top-left-radius: var(--radius);
-    border-top-right-radius: var(--radius);
-  }
-
-  .rounded-b-lg {
-    border-bottom-right-radius: var(--radius);
-    border-bottom-left-radius: var(--radius);
-  }
-
   .border {
     border-style: var(--tw-border-style);
     border-width: 1px;
@@ -1363,11 +1348,6 @@
   .border-b-2 {
     border-bottom-style: var(--tw-border-style);
     border-bottom-width: 2px;
-  }
-
-  .border-l-4 {
-    border-left-style: var(--tw-border-style);
-    border-left-width: 4px;
   }
 
   .border-\[\#F2C230\] {
@@ -1404,10 +1384,6 @@
 
   .border-green-200 {
     border-color: var(--color-green-200);
-  }
-
-  .border-green-500 {
-    border-color: var(--color-green-500);
   }
 
   .border-green-600 {
@@ -1466,10 +1442,6 @@
 
   .border-yellow-200 {
     border-color: var(--color-yellow-200);
-  }
-
-  .border-yellow-500 {
-    border-color: var(--color-yellow-500);
   }
 
   .bg-\[\#F2C230\] {
@@ -1554,14 +1526,6 @@
     background-color: var(--color-gray-200);
   }
 
-  .bg-gray-800 {
-    background-color: var(--color-gray-800);
-  }
-
-  .bg-gray-900 {
-    background-color: var(--color-gray-900);
-  }
-
   .bg-green-50 {
     background-color: var(--color-green-50);
   }
@@ -1576,16 +1540,6 @@
 
   .bg-green-600 {
     background-color: var(--color-green-600);
-  }
-
-  .bg-green-900\/30 {
-    background-color: color-mix(in srgb, oklch(.393 .095 152.535) 30%, transparent);
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .bg-green-900\/30 {
-      background-color: color-mix(in oklab, var(--color-green-900) 30%, transparent);
-    }
   }
 
   .bg-input-background {
@@ -1670,16 +1624,6 @@
     background-color: var(--color-red-600);
   }
 
-  .bg-red-900\/30 {
-    background-color: color-mix(in srgb, oklch(.396 .141 25.723) 30%, transparent);
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .bg-red-900\/30 {
-      background-color: color-mix(in oklab, var(--color-red-900) 30%, transparent);
-    }
-  }
-
   .bg-secondary {
     background-color: var(--secondary);
   }
@@ -1728,16 +1672,6 @@
 
   .bg-yellow-500 {
     background-color: var(--color-yellow-500);
-  }
-
-  .bg-yellow-900\/30 {
-    background-color: color-mix(in srgb, oklch(.421 .095 57.708) 30%, transparent);
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .bg-yellow-900\/30 {
-      background-color: color-mix(in oklab, var(--color-yellow-900) 30%, transparent);
-    }
   }
 
   .bg-gradient-to-br {
@@ -2111,10 +2045,6 @@
     line-height: var(--tw-leading, var(--text-xs--line-height));
   }
 
-  .text-\[10px\] {
-    font-size: 10px;
-  }
-
   .leading-none {
     --tw-leading: 1;
     line-height: 1;
@@ -2203,10 +2133,6 @@
     color: var(--color-gray-900);
   }
 
-  .text-green-200 {
-    color: var(--color-green-200);
-  }
-
   .text-green-500 {
     color: var(--color-green-500);
   }
@@ -2255,10 +2181,6 @@
     color: var(--color-purple-900);
   }
 
-  .text-red-200 {
-    color: var(--color-red-200);
-  }
-
   .text-red-600 {
     color: var(--color-red-600);
   }
@@ -2295,10 +2217,6 @@
     .text-white\/80 {
       color: color-mix(in oklab, var(--color-white) 80%, transparent);
     }
-  }
-
-  .text-yellow-200 {
-    color: var(--color-yellow-200);
   }
 
   .text-yellow-600 {
@@ -2697,12 +2615,6 @@
   @media (hover: hover) {
     .hover\:bg-gray-100:hover {
       background-color: var(--color-gray-100);
-    }
-  }
-
-  @media (hover: hover) {
-    .hover\:bg-gray-700:hover {
-      background-color: var(--color-gray-700);
     }
   }
 

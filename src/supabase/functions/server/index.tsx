@@ -23,12 +23,10 @@ async function initializeStorage() {
     
     if (!buckets?.some(b => b.name === CV_BUCKET)) {
       await supabase.storage.createBucket(CV_BUCKET, { public: false });
-      console.log(`Created bucket: ${CV_BUCKET}`);
     }
     
     if (!buckets?.some(b => b.name === LOGO_BUCKET)) {
       await supabase.storage.createBucket(LOGO_BUCKET, { public: false });
-      console.log(`Created bucket: ${LOGO_BUCKET}`);
     }
   } catch (error) {
     console.error('Error initializing storage:', error);
@@ -38,8 +36,6 @@ async function initializeStorage() {
 // Initialize demo users
 async function initializeDemoUsers() {
   try {
-    console.log('Initializing demo users...');
-    
     const demoUsers = [
       { email: 'admin@euroconnect.eu', password: 'admin123', name: 'Admin', role: 'candidate' },
       { email: 'office@euroconnectbg.com', password: 'office123', name: 'Office Admin', role: 'candidate' },
@@ -59,9 +55,7 @@ async function initializeDemoUsers() {
         
         if (error) {
           // User might already exist, which is fine
-          if (error.message.includes('already been registered')) {
-            console.log(`Demo user already exists: ${user.email}`);
-          } else {
+          if (!error.message.includes('already been registered')) {
             console.error(`Error creating demo user ${user.email}:`, error);
           }
         } else {
@@ -77,19 +71,11 @@ async function initializeDemoUsers() {
             isPremium,
             createdAt: new Date().toISOString(),
           });
-          console.log(`Created demo user: ${user.email} ${isPremium ? '👑 PREMIUM' : ''}`);
         }
       } catch (err) {
         console.error(`Error with demo user ${user.email}:`, err);
       }
     }
-    
-    console.log('✅ Demo users initialized!');
-    console.log('📧 Login credentials:');
-    console.log('   Admin: admin@euroconnect.eu / admin123');
-    console.log('   Office Admin: office@euroconnectbg.com / office123');
-    console.log('   Candidate: candidate@test.com / candidate123');
-    console.log('   Employer: employer@test.com / employer123');
   } catch (error) {
     console.error('Error initializing demo users:', error);
   }
@@ -158,11 +144,7 @@ async function sendEmailNotification(params: {
 }) {
   const emailId = crypto.randomUUID();
   
-  // Log the email for debugging
-  console.log('📧 Email Notification:');
-  console.log('To:', params.to);
-  console.log('Subject:', params.subject);
-  console.log('---');
+  // Email notification - logging minimal for production
   
   try {
     // Check email config from KV store first
@@ -179,22 +161,16 @@ async function sendEmailNotification(params: {
       
       // Auto-fix: Ensure fromEmail uses verified domain (euroconnectbg.com)
       if (configFromEmail && configFromEmail.includes('@euroconnect.eu')) {
-        console.warn('⚠️ Auto-correcting unverified domain @euroconnect.eu to @euroconnectbg.com');
         configFromEmail = configFromEmail.replace('@euroconnect.eu', '@euroconnectbg.com');
       }
       
       fromEmail = `${emailConfig.fromName} <${configFromEmail}>`;
-      console.log('Using Resend API key from Admin Panel configuration');
     } else {
       // Fallback to environment variable
       resendApiKey = Deno.env.get('RESEND_API_KEY');
-      if (resendApiKey) {
-        console.log('Using Resend API key from environment variable');
-      }
     }
     
     if (resendApiKey) {
-      console.log('Sending email via Resend...');
       
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -227,7 +203,7 @@ async function sendEmailNotification(params: {
         throw new Error(`Resend API error: ${JSON.stringify(result)}`);
       }
       
-      console.log('✅ Email sent successfully via Resend:', result.id);
+
       
       // Store email log in KV for tracking
       await kv.set(`email:${emailId}`, {
@@ -243,8 +219,7 @@ async function sendEmailNotification(params: {
       
       return { success: true, emailId, resendId: result.id };
     } else {
-      console.warn('⚠️ Resend API key not configured - email will not be sent');
-      console.warn('   Configure it in Admin Panel > Settings > Email Notifikacije or set RESEND_API_KEY env var');
+
       
       // Store email log in KV for tracking (but not sent)
       await kv.set(`email:${emailId}`, {
