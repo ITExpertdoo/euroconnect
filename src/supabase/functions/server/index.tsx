@@ -16,6 +16,30 @@ const supabase = createClient(
 const CV_BUCKET = 'make-fe64975a-cvs';
 const LOGO_BUCKET = 'make-fe64975a-logos';
 
+// Helper function to convert plain text to HTML with clickable links
+function convertTextToHtml(text: string): string {
+  // URL regex pattern - detects http://, https://, and www. URLs
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  
+  // First, escape any HTML special characters
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  
+  // Convert URLs to clickable links
+  html = html.replace(urlRegex, (url) => {
+    // Add protocol if missing
+    const href = url.startsWith('http') ? url : `https://${url}`;
+    return `<a href="${href}" style="color: #1E5A8C; text-decoration: underline;">${url}</a>`;
+  });
+  
+  // Convert newlines to <br> tags
+  html = html.replace(/\n/g, '<br>');
+  
+  return html;
+}
+
 // Initialize storage buckets
 async function initializeStorage() {
   try {
@@ -187,7 +211,7 @@ async function sendEmailNotification(params: {
               <h1 style="color: #F2C230; margin: 0;">EuroConnect Europe</h1>
             </div>
             <div style="padding: 20px; background-color: #f9f9f9;">
-              ${params.body.replace(/\n/g, '<br>')}
+              ${convertTextToHtml(params.body)}
             </div>
             <div style="padding: 15px; background-color: #0E395C; text-align: center; color: white; font-size: 12px;">
               <p style="margin: 0;">© 2025 EuroConnect Europe. Sva prava zadržana.</p>
@@ -299,6 +323,32 @@ app.post("/make-server-fe64975a/auth/signup", async (c) => {
       isPremium: false,
       createdAt: new Date().toISOString(),
     });
+    
+    // Send welcome email to the new user
+    try {
+      const roleText = role === 'candidate' ? 'kandidat' : 'poslodavac';
+      await sendEmailNotification({
+        to: email,
+        subject: 'Dobrodošli na EuroConnect Europe!',
+        body: `Poštovani/a ${name},\n\nDobrodošli na EuroConnect Europe platformu!\n\nVaš nalog je uspešno kreiran kao ${roleText}.\n\nEmail: ${email}\n\nSada možete da se prijavite i počnete da koristite platformu.\n\nSrdačan pozdrav,\nEuroConnect Europe Tim`
+      });
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail registration if email fails
+    }
+    
+    // Send notification to admin team
+    try {
+      const roleText = role === 'candidate' ? 'Kandidat' : 'Poslodavac';
+      await sendEmailNotification({
+        to: 'office@euroconnectbg.com',
+        subject: `Novi korisnik registrovan - ${roleText}`,
+        body: `Novi korisnik se registrovao na platformi:\n\nIme: ${name}\nEmail: ${email}\nTip naloga: ${roleText}\nDatum registracije: ${new Date().toLocaleString('sr-RS')}\n\nEuroConnect Europe Platforma`
+      });
+    } catch (emailError) {
+      console.error('Failed to send admin notification email:', emailError);
+      // Don't fail registration if email fails
+    }
     
     return c.json({ 
       success: true, 
