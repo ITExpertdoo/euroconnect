@@ -21,10 +21,9 @@ interface AuthModalProps {
   onClose: () => void;
   defaultTab?: 'login' | 'signup';
   defaultRole?: 'candidate' | 'employer';
-  onOpenResetModal?: (token: string) => void;
 }
 
-export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole, onOpenResetModal }: AuthModalProps) {
+export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole }: AuthModalProps) {
   const { login, signup } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -267,7 +266,6 @@ export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole, on
     <ForgotPasswordModal 
       open={showForgotPassword}
       onClose={() => setShowForgotPassword(false)}
-      onOpenResetModal={onOpenResetModal}
     />
     </>
   );

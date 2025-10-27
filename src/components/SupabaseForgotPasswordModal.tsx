@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner@2.0.3';
-import { Loader2, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, CheckCircle } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 interface SupabaseForgotPasswordModalProps {
@@ -89,30 +89,6 @@ export function SupabaseForgotPasswordModal({
             Unesite svoju email adresu i poslaćemo vam link za reset lozinke
           </DialogDescription>
         </DialogHeader>
-
-        {/* Configuration Warning */}
-        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-blue-900 font-medium">
-                ℹ️ Kako radi Reset Password
-              </p>
-              <p className="text-xs text-blue-800 mt-1">
-                Sistem će poslati email sa linkom za reset lozinke na <code className="bg-blue-100 px-1 rounded">{redirectUrl}?reset-token=xxxxx</code>
-              </p>
-              <ol className="text-xs text-blue-800 mt-2 space-y-1 list-decimal list-inside">
-                <li>Unesi svoj email i klikni "Pošalji Reset Link"</li>
-                <li>Proveri inbox i klikni na link u email-u</li>
-                <li>Automatski će se otvoriti Reset Password forma</li>
-                <li>Unesi novu lozinku i potvrdi</li>
-              </ol>
-              <p className="text-xs text-blue-800 mt-2 font-medium">
-                ⚠️ <strong>Napomena:</strong> Za testiranje u Figma Make, koristi "⚡ INSTANT TEST" dugme u Admin Panel → Settings.
-              </p>
-            </div>
-          </div>
-        </div>
 
         {!emailSent ? (
           <form onSubmit={handleSubmit} className="space-y-4">

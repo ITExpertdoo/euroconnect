@@ -12,9 +12,7 @@ import {
   Loader2,
   FileText,
 } from 'lucide-react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
-import { ResetLinkModal } from './ResetLinkModal';
 
 interface EmailConfigSectionProps {
   emailConfig: any;
@@ -37,7 +35,6 @@ interface EmailConfigSectionProps {
   savingEmail: boolean;
   handleSaveEmailConfig: () => void;
   handleTestEmail: () => void;
-  onOpenResetModal?: (token: string) => void; // New callback for opening reset modal
 }
 
 export function EmailConfigSection({
@@ -49,11 +46,7 @@ export function EmailConfigSection({
   savingEmail,
   handleSaveEmailConfig,
   handleTestEmail,
-  onOpenResetModal,
 }: EmailConfigSectionProps) {
-  const [showResetLinkModal, setShowResetLinkModal] = React.useState(false);
-  const [resetLink, setResetLink] = React.useState('');
-  const [currentResetToken, setCurrentResetToken] = React.useState('');
   
   return (
     <div className="space-y-6">
@@ -383,201 +376,6 @@ export function EmailConfigSection({
                 Test Email
               </Button>
             </div>
-            
-            {/* Quick Reset Test - Direct Modal */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Show Reset Link - No Email */}
-              <Button
-                onClick={async () => {
-                  try {
-                    console.log('🔗 TEST: Getting reset link without sending email...');
-                    toast.info('🔗 Generišem test reset link...');
-                    
-                    const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-fe64975a/auth/forgot-password`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${publicAnonKey}`,
-                      },
-                      body: JSON.stringify({ email: 'office@euroconnectbg.com' }),
-                    });
-
-                    const data = await response.json();
-                    console.log('📦 Backend response:', data);
-                    
-                    if (response.ok && data.resetToken) {
-                      const currentOrigin = window.location.origin;
-                      const generatedLink = `${currentOrigin}?reset-token=${data.resetToken}`;
-                      
-                      // Save token for simulation
-                      setCurrentResetToken(data.resetToken);
-                      
-                      // Show in modal instead of alert
-                      setResetLink(generatedLink);
-                      setShowResetLinkModal(true);
-                      
-                      console.log('🔗 Reset link would be:', generatedLink);
-                      toast.success('✅ Link je prikazan u modalu!');
-                    } else {
-                      toast.error('❌ Backend nije vratio token!');
-                    }
-                  } catch (error: any) {
-                    console.error('❌ Test error:', error);
-                    toast.error(`Greška: ${error.message}`);
-                  }
-                }}
-                variant="outline"
-                className="w-full border-2 border-yellow-500 text-yellow-700 hover:bg-yellow-50"
-                size="lg"
-              >
-                🔗 Show Reset Link
-              </Button>
-              
-              {/* Auto Test - Calls Backend First */}
-              <Button
-                onClick={async () => {
-                  try {
-                    console.log('🧪 LOCAL AUTO TEST START');
-                    toast.info('🧪 Pozivam backend za test token...');
-                    
-                    // Use office admin account for testing
-                    const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-fe64975a/auth/forgot-password`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${publicAnonKey}`,
-                      },
-                      body: JSON.stringify({ email: 'office@euroconnectbg.com' }),
-                    });
-
-                    const data = await response.json();
-                    console.log('📦 Backend response:', data);
-                    
-                    if (response.ok && data.resetToken) {
-                      console.log('🔑 Test token received:', data.resetToken);
-                      
-                      if (onOpenResetModal) {
-                        console.log('✅ Callback exists, opening modal...');
-                        toast.success('✅ Modal se otvara za office@euroconnectbg.com!');
-                        onOpenResetModal(data.resetToken);
-                      } else {
-                        console.error('❌ onOpenResetModal callback missing!');
-                        toast.error('❌ Callback nije definisan!');
-                      }
-                    } else {
-                      toast.error('❌ Backend nije vratio token!');
-                    }
-                  } catch (error: any) {
-                    console.error('❌ Test error:', error);
-                    toast.error(`Greška: ${error.message}`);
-                  }
-                }}
-                variant="outline"
-                className="w-full border-2 border-green-500 text-green-700 hover:bg-green-50"
-                size="lg"
-              >
-                🧪 Local Test (office@euroconnectbg.com)
-              </Button>
-              
-              {/* Backend Test - Real Email */}
-              <Button
-                onClick={async () => {
-                  try {
-                    console.log('🔑 Requesting reset token...');
-                    toast.info('🔑 Requesting reset token...');
-                    
-                    const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-fe64975a/auth/forgot-password`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${publicAnonKey}`,
-                      },
-                      body: JSON.stringify({ email: 'office@euroconnectbg.com' }),
-                    });
-
-                    console.log('📥 Response status:', response.status);
-                    
-                    const responseText = await response.text();
-                    console.log('📄 Response text:', responseText);
-                    
-                    let data;
-                    try {
-                      data = JSON.parse(responseText);
-                    } catch (parseError) {
-                      console.error('❌ JSON parse error:', parseError);
-                      toast.error('Backend vratio neispravan format. Otvori Debug Console za detalje.');
-                      return;
-                    }
-                    
-                    console.log('📦 Parsed data:', data);
-                    
-                    if (response.ok && data.resetToken) {
-                      console.log('✅ Reset token received:', data.resetToken);
-                      
-                      if (onOpenResetModal) {
-                        console.log('🚀 Calling onOpenResetModal callback...');
-                        toast.success('✅ Otvaram Reset Password modal...');
-                        onOpenResetModal(data.resetToken);
-                      } else {
-                        console.error('❌ onOpenResetModal callback nije definisan!');
-                        toast.error('Greška: Modal callback nije definisan');
-                      }
-                    } else {
-                      console.error('❌ Error from server:', data);
-                      toast.error(data.error || 'Greška pri kreiranju reset linka');
-                    }
-                  } catch (error: any) {
-                    console.error('❌ Error testing reset:', error);
-                    toast.error(`Greška: ${error.message}`);
-                  }
-                }}
-                variant="outline"
-                className="w-full border-2 border-purple-500 text-purple-700 hover:bg-purple-50"
-                size="lg"
-              >
-                🚀 Backend Test (Real Email)
-              </Button>
-            </div>
-            
-            {/* INSTANT TEST BUTTON - Outside grid, full width */}
-            <Button
-              onClick={async () => {
-                try {
-                  toast.info('🔑 Generišem reset link...');
-                  
-                  const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-fe64975a/auth/forgot-password`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${publicAnonKey}`,
-                    },
-                    body: JSON.stringify({ email: 'office@euroconnectbg.com' }),
-                  });
-                  
-                  const data = await response.json();
-                  
-                  if (response.ok && data.resetToken) {
-                    const resetUrl = `${window.location.origin}?reset-token=${data.resetToken}`;
-                    console.log('🔗 Reset URL:', resetUrl);
-                    
-                    // Open in new tab
-                    window.open(resetUrl, '_blank');
-                    
-                    toast.success('✅ Reset stranica otvorena u novom tabu!');
-                  } else {
-                    toast.error(data.error || 'Greška pri generisanju linka');
-                  }
-                } catch (error: any) {
-                  console.error('❌ Error:', error);
-                  toast.error(`Greška: ${error.message}`);
-                }
-              }}
-              variant="default"
-              className="w-full bg-gradient-to-r from-gold to-yellow-500 text-gold-foreground hover:from-gold/90 hover:to-yellow-500/90 border-2 border-yellow-600"
-              size="lg"
-            >
-              ⚡ INSTANT TEST - Otvori Reset Stranicu (Novi Tab)
-            </Button>
           </div>
 
           {/* Info Box */}
@@ -635,24 +433,6 @@ export function EmailConfigSection({
           </div>
         </CardContent>
       </Card>
-      
-      {/* Reset Link Modal */}
-      <ResetLinkModal
-        isOpen={showResetLinkModal}
-        onClose={() => {
-          setShowResetLinkModal(false);
-          setResetLink('');
-          setCurrentResetToken('');
-        }}
-        resetLink={resetLink}
-        onSimulateClick={() => {
-          // Extract token from link and open reset modal
-          if (currentResetToken && onOpenResetModal) {
-            console.log('🎭 Simulating email click with token:', currentResetToken);
-            onOpenResetModal(currentResetToken);
-          }
-        }}
-      />
     </div>
   );
 }

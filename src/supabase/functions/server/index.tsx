@@ -154,6 +154,7 @@ async function sendEmailNotification(params: {
   to: string;
   subject: string;
   body: string;
+  htmlBody?: string; // Optional HTML body for custom emails
 }) {
   const emailId = crypto.randomUUID();
   
@@ -161,7 +162,6 @@ async function sendEmailNotification(params: {
   console.log('📧 Email Notification:');
   console.log('To:', params.to);
   console.log('Subject:', params.subject);
-  console.log('Body:', params.body);
   console.log('---');
   
   try {
@@ -452,8 +452,7 @@ app.post("/make-server-fe64975a/auth/forgot-password", async (c) => {
       const appUrl = emailConfig.appUrl || c.req.header('origin') || 'https://your-app.com';
       const resetUrl = `${appUrl}?reset-token=${resetToken}`;
       
-      console.log(`📧 Generating reset URL with appUrl: ${appUrl}`);
-      console.log(`🔗 Full reset URL: ${resetUrl}`);
+
       
       const emailResult = await sendEmailNotification({
         to: email,
@@ -471,8 +470,6 @@ app.post("/make-server-fe64975a/auth/forgot-password", async (c) => {
     }
     
     // Return token for testing purposes (in production, don't return this!)
-    console.log(`✅ Forgot password completed successfully for ${email}`);
-    console.log(`🔗 Reset token: ${resetToken}`);
     
     return c.json({ 
       message: 'Reset link je poslat na vaš email',

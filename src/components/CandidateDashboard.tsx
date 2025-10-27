@@ -197,14 +197,6 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
 
     return (
       <div>
-        {/* DEBUG: Premium Status Info */}
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-          <p><strong>Debug Info:</strong></p>
-          <p>Premium Status: <strong className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ PREMIUM' : '❌ NOT PREMIUM'}</strong></p>
-          <p>Admin Status: <strong className={isAdmin ? 'text-gold' : 'text-gray-600'}>{isAdmin ? '👑 ADMIN' : 'Regular User'}</strong></p>
-          <p>Total Jobs: {jobs.length} | Premium Jobs: {jobs.filter(j => j.isPremium).length} | Visible Jobs: {filteredJobs.length}</p>
-        </div>
-
         {/* Premium Notice if not premium */}
         {!isPremium && !isAdmin && jobs.some(job => job.isPremium) && (
           <div className="mb-6 bg-gold/10 border-2 border-gold rounded-lg p-4">

@@ -835,12 +835,6 @@ export function AdminPanel({ onNavigate, onOpenResetModal }: AdminPanelProps) {
                 savingEmail={savingEmail}
                 handleSaveEmailConfig={handleSaveEmailConfig}
                 handleTestEmail={handleTestEmail}
-                onOpenResetModal={(token) => {
-                  console.log('🚀 Opening reset modal with token:', token);
-                  toast.success('✅ Reset modal se otvara...');
-                  setResetToken(token);
-                  setShowResetModal(true);
-                }}
               />
             </div>
           </TabsContent>
