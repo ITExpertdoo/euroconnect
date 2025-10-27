@@ -26,7 +26,7 @@ export function LicensingPage({ onNavigate }: LicensingPageProps) {
   const licenses = [
     {
       name: 'EU Agencija za zapošljavanje',
-      country: 'Njemačka',
+      country: 'Nemačka',
       status: 'active',
       issueDate: '15.02.2023',
       expiryDate: '15.02.2028',

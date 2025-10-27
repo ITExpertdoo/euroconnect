@@ -7,6 +7,8 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { AuthModal } from './AuthModal';
 import { ApplyToJobModal } from './ApplyToJobModal';
+import { Logo } from './Logo';
+import { ContactSection } from './ContactSection';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../utils/api';
 import { 
@@ -33,9 +35,10 @@ import {
 
 interface LandingPageProps {
   onNavigate?: (page: string) => void;
+  onOpenResetModal?: (token: string) => void;
 }
 
-export function LandingPage({ onNavigate }: LandingPageProps) {
+export function LandingPage({ onNavigate, onOpenResetModal }: LandingPageProps) {
   const { user, logout, isAuthenticated, isPremium, isAdmin } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultRole, setAuthDefaultRole] = useState<'candidate' | 'employer' | undefined>(undefined);
@@ -49,6 +52,13 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
   useEffect(() => {
     loadJobs();
   }, []);
+
+  useEffect(() => {
+    // Auto-search when country filter changes
+    if (searchCountry !== 'all') {
+      handleSearch();
+    }
+  }, [searchCountry]);
 
   const loadJobs = async (filters?: { location?: string; search?: string }) => {
     setLoading(true);
@@ -113,6 +123,21 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
     setApplyModalOpen(true);
   };
 
+  const handleLogout = () => {
+    logout();
+  };
+
+  const handleCountryGuideClick = (country: string) => {
+    // Set the country filter
+    setSearchCountry(country);
+    
+    // Scroll to jobs section
+    const jobsSection = document.getElementById('jobs');
+    if (jobsSection) {
+      jobsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <>
       <AuthModal 
@@ -122,6 +147,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           setAuthDefaultRole(undefined);
         }}
         defaultRole={authDefaultRole}
+        onOpenResetModal={onOpenResetModal}
       />
       {selectedJob && (
         <ApplyToJobModal 
@@ -139,12 +165,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">EC</span>
-            </div>
-            <span className="text-xl font-semibold text-primary">EuroConnect Europe</span>
-          </div>
+          <Logo size="md" className="cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
           
           <nav className="hidden md:flex items-center gap-6">
             <a href="#jobs" className="text-gray-600 hover:text-primary cursor-pointer">Poslovi</a>
@@ -175,7 +196,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-600">Pozdrav, {user?.name}</span>
-                <Button variant="outline" size="sm" onClick={logout}>
+                <Button variant="outline" size="sm" onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Odjava
                 </Button>
@@ -271,14 +292,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Sve zemlje</SelectItem>
-                  <SelectItem value="Nemačka">🇩🇪 Njemačka</SelectItem>
+                  <SelectItem value="Nemačka">🇩🇪 Nemačka</SelectItem>
                   <SelectItem value="Austrija">🇦🇹 Austrija</SelectItem>
                   <SelectItem value="Holandija">🇳🇱 Holandija</SelectItem>
-                  <SelectItem value="Švicarska">🇨🇭 Švicarska</SelectItem>
-                  <SelectItem value="Belgija">🇧🇪 Belgija</SelectItem>
-                  <SelectItem value="Francuska">🇫🇷 Francuska</SelectItem>
-                  <SelectItem value="Norveška">🇳🇴 Norveška</SelectItem>
-                  <SelectItem value="Švedska">🇸🇪 Švedska</SelectItem>
                 </SelectContent>
               </Select>
               <Input 
@@ -453,7 +469,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <h2 className="text-3xl font-bold text-center mb-12 text-primary">Vodiči po zemljama</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { country: 'Njemačka', flag: '🇩🇪', jobs: '450+ poslova' },
+              { country: 'Nemačka', flag: '🇩🇪', jobs: '450+ poslova' },
               { country: 'Austrija', flag: '🇦🇹', jobs: '280+ poslova' },
               { country: 'Holandija', flag: '🇳🇱', jobs: '220+ poslova' }
             ].map((guide, index) => (
@@ -462,7 +478,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   <div className="text-6xl mb-4">{guide.flag}</div>
                   <h3 className="text-xl font-semibold mb-2">{guide.country}</h3>
                   <p className="text-gray-600 mb-4">{guide.jobs}</p>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={() => handleCountryGuideClick(guide.country)}>
                     Pogledaj vodič
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
@@ -502,24 +518,42 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Contact Section */}
+      <ContactSection />
+
       {/* Footer */}
       <footer className="bg-primary text-white py-12">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-[#F2C230] rounded-lg flex items-center justify-center">
-                  <span className="text-primary font-bold">EC</span>
-                </div>
-                <span className="text-xl font-semibold">EuroConnect Europe</span>
-              </div>
+              <Logo size="sm" variant="dark" className="mb-4" />
               <p className="text-gray-300 mb-4">
                 Platforma koja povezuje radnike sa Balkana s vjerifikovanim poslodavcima u EU.
               </p>
               <div className="flex gap-4">
-                <MessageSquare className="w-5 h-5" />
-                <Mail className="w-5 h-5" />
-                <Phone className="w-5 h-5" />
+                <a 
+                  href="https://wa.me/381637029064" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-gold transition-colors cursor-pointer"
+                  title="WhatsApp Chat"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </a>
+                <a 
+                  href="mailto:office@euroconnect.eu"
+                  className="hover:text-gold transition-colors cursor-pointer"
+                  title="Pošaljite Email"
+                >
+                  <Mail className="w-5 h-5" />
+                </a>
+                <a 
+                  href="tel:+381637029064"
+                  className="hover:text-gold transition-colors cursor-pointer"
+                  title="Pozovite nas"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
               </div>
             </div>
             

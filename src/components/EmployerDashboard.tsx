@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { Logo } from './Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../utils/api';
 import { toast } from 'sonner@2.0.3';
@@ -254,12 +255,7 @@ export function EmployerDashboard({ onNavigate }: EmployerDashboardProps = {}) {
       <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 border-b">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate?.('landing')}>
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">EC</span>
-              </div>
-              <span className="text-sm font-semibold text-primary">EuroConnect</span>
-            </div>
+            <Logo size="sm" className="cursor-pointer" onClick={() => onNavigate?.('landing')} />
             <button className="md:hidden" onClick={() => setMobileMenuOpen(false)}>
               <X className="w-5 h-5" />
             </button>

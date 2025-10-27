@@ -46,6 +46,11 @@ export function ResetPasswordModal({ open, onClose, resetToken }: ResetPasswordM
     setLoading(true);
 
     try {
+      console.log('🔐 Attempting password reset...');
+      console.log('📌 Token being sent:', resetToken);
+      console.log('📌 Token length:', resetToken?.length);
+      console.log('📌 New password length:', newPassword?.length);
+      
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-fe64975a/auth/reset-password`,
         {
@@ -62,15 +67,18 @@ export function ResetPasswordModal({ open, onClose, resetToken }: ResetPasswordM
       );
 
       const data = await response.json();
+      
+      console.log('🔐 Reset password response:', { status: response.status, data });
 
       if (response.ok) {
         setSuccess(true);
         toast.success('Lozinka uspešno promenjena!');
       } else {
+        console.error('❌ Reset password error:', data.error);
         toast.error(data.error || 'Greška prilikom promene lozinke');
       }
     } catch (error) {
-      console.error('Reset password error:', error);
+      console.error('❌ Reset password exception:', error);
       toast.error('Greška prilikom promene lozinke');
     } finally {
       setLoading(false);
@@ -92,6 +100,16 @@ export function ResetPasswordModal({ open, onClose, resetToken }: ResetPasswordM
           <DialogDescription>
             Unesite novu lozinku za vaš nalog
           </DialogDescription>
+          {resetToken && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+              <p className="text-blue-900">
+                ✅ Reset token aktivan (test mode)
+              </p>
+              <p className="text-blue-700 font-mono mt-1 truncate">
+                Token: {resetToken.slice(0, 20)}...
+              </p>
+            </div>
+          )}
         </DialogHeader>
 
         {!success ? (

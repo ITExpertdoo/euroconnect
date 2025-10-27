@@ -21,9 +21,10 @@ interface AuthModalProps {
   onClose: () => void;
   defaultTab?: 'login' | 'signup';
   defaultRole?: 'candidate' | 'employer';
+  onOpenResetModal?: (token: string) => void;
 }
 
-export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole }: AuthModalProps) {
+export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole, onOpenResetModal }: AuthModalProps) {
   const { login, signup } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -124,24 +125,7 @@ export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole }: 
           </TabsList>
 
           <TabsContent value="login">
-            {/* Demo Credentials Info */}
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs font-medium text-blue-900 mb-2">🔑 Demo kredencijali za testiranje:</p>
-              <div className="space-y-1 text-xs text-blue-800">
-                <div className="flex justify-between items-center">
-                  <span>Admin:</span>
-                  <code className="bg-white px-2 py-0.5 rounded">admin@euroconnect.eu / admin123</code>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Kandidat:</span>
-                  <code className="bg-white px-2 py-0.5 rounded">candidate@test.com / candidate123</code>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Poslodavac:</span>
-                  <code className="bg-white px-2 py-0.5 rounded">employer@test.com / employer123</code>
-                </div>
-              </div>
-            </div>
+            {/* Demo Credentials Info - Hidden but still functional */}
             
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
@@ -193,13 +177,7 @@ export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole }: 
           </TabsContent>
 
           <TabsContent value="signup">
-            {/* Demo Info */}
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-xs text-amber-900">
-                💡 <strong>Tip:</strong> Demo korisnici su već kreirani. Možete se odmah prijaviti sa postojećim kredencijalima 
-                ili kreirati novi nalog.
-              </p>
-            </div>
+            {/* Demo Info - Hidden but credentials still work */}
             
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
@@ -222,9 +200,6 @@ export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole }: 
                   value={signupData.email}
                   onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  💡 Za admin pristup koristite: <span className="font-mono text-primary">admin@euroconnect.eu</span>
-                </p>
               </div>
               <div>
                 <Label htmlFor="signup-password">Lozinka</Label>
@@ -292,6 +267,7 @@ export function AuthModal({ open, onClose, defaultTab = 'login', defaultRole }: 
     <ForgotPasswordModal 
       open={showForgotPassword}
       onClose={() => setShowForgotPassword(false)}
+      onOpenResetModal={onOpenResetModal}
     />
     </>
   );

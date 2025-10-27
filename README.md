@@ -1,7 +1,7 @@
 
-  # Design System for EuroConnect
+  # Design System for EuroConnect final
 
-  This is a code bundle for Design System for EuroConnect. The original project is available at https://www.figma.com/design/DK4fd6AlSnzaw9gNqo63bq/Design-System-for-EuroConnect.
+  This is a code bundle for Design System for EuroConnect final. The original project is available at https://www.figma.com/design/DK4fd6AlSnzaw9gNqo63bq/Design-System-for-EuroConnect-final.
 
   ## Running the code
 

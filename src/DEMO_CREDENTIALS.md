@@ -4,7 +4,7 @@
 
 Pri prvom pokretanju servera, sistem automatski kreira sledeće demo korisnike:
 
-### 👑 Admin nalog
+### 👑 Admin nalog (Originalni)
 ```
 Email: admin@euroconnect.eu
 Lozinka: admin123
@@ -20,11 +20,30 @@ Uloga: Admin (pun pristup svim funkcijama)
 
 ---
 
+### 👑 Office Admin nalog (Novi)
+```
+Email: office@euroconnectbg.com
+Lozinka: office123
+Uloga: Admin (pun pristup svim funkcijama)
+```
+
+**Pristup:**
+- Admin Panel
+- Backend Demo
+- Candidate Dashboard  
+- Employer Dashboard
+- Sve ostale stranice
+
+**💡 Napomena:** Ovo je novi admin nalog sa email adresom koja odgovara verifikovanoj domeni za email notifikacije.
+
+---
+
 ### 👤 Kandidat nalog
 ```
 Email: candidate@test.com
 Lozinka: candidate123
 Uloga: Candidate
+Premium Status: ✅ AKTIVIRAN (365 dana)
 ```
 
 **Pristup:**
@@ -33,7 +52,7 @@ Uloga: Candidate
 - Upload dokumenata
 - Saved Jobs
 - Messages
-- Premium oglasi (ako kupi premium)
+- ✅ **Premium oglasi (automatski uključen za testiranje)**
 
 ---
 
@@ -75,6 +94,11 @@ Premium paketi omogućavaju pristup premium oglasima:
 - **Basic Premium**: €9.99/mesec
 - **Professional Premium**: €29.99/3 meseca  
 - **Enterprise Premium**: €99.99/godinu
+
+**💡 VAŽNO:** 
+- Testni nalog `candidate@test.com` **AUTOMATSKI ima premium status** za lakše testiranje!
+- Admin može dodati/ukloniti premium status bilo kom korisniku preko Admin Panel > Korisnici > "Dodaj/Ukloni Premium" dugme
+- Novi korisnici koji se registruju NEMAJU premium po default-u i moraju platiti za pristup premium oglasima
 
 ### Za poslodavce:
 Premium opcije za istaknute oglase:
@@ -122,3 +146,18 @@ Kada se registrujete, automatski ćete biti ulogovani i preusmereni na odgovaraj
 
 ### Email konfirmacija:
 Email konfirmacija je automatski uključena (`email_confirm: true`) jer email server nije konfigurisan.
+
+---
+
+## 📧 Brzi pregled svih kredencijala:
+
+| Uloga | Email | Lozinka | Opis |
+|-------|-------|---------|------|
+| 👑 **Admin** | `admin@euroconnect.eu` | `admin123` | Originalni admin nalog |
+| 👑 **Office Admin** | `office@euroconnectbg.com` | `office123` | Novi admin nalog (verifikovana domena) |
+| 👤 **Kandidat** | `candidate@test.com` | `candidate123` | Sa premium statusom |
+| 💼 **Poslodavac** | `employer@test.com` | `employer123` | Test poslodavac |
+
+---
+
+_Poslednja izmena: 27. oktobar 2025_

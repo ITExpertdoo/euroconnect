@@ -42,6 +42,7 @@ async function initializeDemoUsers() {
     
     const demoUsers = [
       { email: 'admin@euroconnect.eu', password: 'admin123', name: 'Admin', role: 'candidate' },
+      { email: 'office@euroconnectbg.com', password: 'office123', name: 'Office Admin', role: 'candidate' },
       { email: 'candidate@test.com', password: 'candidate123', name: 'Test Kandidat', role: 'candidate' },
       { email: 'employer@test.com', password: 'employer123', name: 'Test Poslodavac', role: 'employer' },
     ];
@@ -65,17 +66,18 @@ async function initializeDemoUsers() {
           }
         } else {
           // Store user profile in KV
-          const isAdmin = user.email === 'admin@euroconnect.eu';
+          const isAdmin = user.email === 'admin@euroconnect.eu' || user.email === 'office@euroconnectbg.com';
+          const isPremium = user.email === 'candidate@test.com' || isAdmin; // Test candidate ima premium!
           await kv.set(`user:${data.user.id}`, {
             id: data.user.id,
             email: user.email,
             name: user.name,
             role: user.role,
             isAdmin,
-            isPremium: false,
+            isPremium,
             createdAt: new Date().toISOString(),
           });
-          console.log(`Created demo user: ${user.email}`);
+          console.log(`Created demo user: ${user.email} ${isPremium ? '👑 PREMIUM' : ''}`);
         }
       } catch (err) {
         console.error(`Error with demo user ${user.email}:`, err);
@@ -85,6 +87,7 @@ async function initializeDemoUsers() {
     console.log('✅ Demo users initialized!');
     console.log('📧 Login credentials:');
     console.log('   Admin: admin@euroconnect.eu / admin123');
+    console.log('   Office Admin: office@euroconnectbg.com / office123');
     console.log('   Candidate: candidate@test.com / candidate123');
     console.log('   Employer: employer@test.com / employer123');
   } catch (error) {
@@ -92,9 +95,25 @@ async function initializeDemoUsers() {
   }
 }
 
+// Auto-fix email domain on startup
+async function fixEmailDomain() {
+  try {
+    const emailConfig = await kv.get('email_config');
+    if (emailConfig && emailConfig.fromEmail && emailConfig.fromEmail.includes('@euroconnect.eu')) {
+      console.log('⚠️ Detected old domain @euroconnect.eu in email config - auto-fixing to @euroconnectbg.com');
+      emailConfig.fromEmail = emailConfig.fromEmail.replace('@euroconnect.eu', '@euroconnectbg.com');
+      await kv.set('email_config', emailConfig);
+      console.log('✅ Email domain auto-fixed to:', emailConfig.fromEmail);
+    }
+  } catch (error) {
+    console.error('Error fixing email domain:', error);
+  }
+}
+
 // Initialize on startup
 initializeStorage();
 initializeDemoUsers();
+fixEmailDomain();
 
 // Enable logger
 app.use('*', logger(console.log));
@@ -136,24 +155,127 @@ async function sendEmailNotification(params: {
   subject: string;
   body: string;
 }) {
-  // Log the email (in production, integrate with email service like SendGrid, Resend, etc.)
+  const emailId = crypto.randomUUID();
+  
+  // Log the email for debugging
   console.log('📧 Email Notification:');
   console.log('To:', params.to);
   console.log('Subject:', params.subject);
   console.log('Body:', params.body);
   console.log('---');
   
-  // Store email log in KV for tracking
-  const emailId = crypto.randomUUID();
-  await kv.set(`email:${emailId}`, {
-    id: emailId,
-    to: params.to,
-    subject: params.subject,
-    body: params.body,
-    sentAt: new Date().toISOString()
-  });
-  
-  return { success: true, emailId };
+  try {
+    // Check email config from KV store first
+    const emailConfig = await kv.get('email_config');
+    
+    // Determine API key source: KV store or environment variable
+    let resendApiKey = null;
+    let fromEmail = 'EuroConnect <noreply@euroconnectbg.com>';  // Changed to match verified domain
+    
+    if (emailConfig?.enabled && emailConfig.provider === 'resend' && emailConfig.apiKey) {
+      // Use config from Admin Panel (KV store)
+      resendApiKey = emailConfig.apiKey;
+      let configFromEmail = emailConfig.fromEmail;
+      
+      // Auto-fix: Ensure fromEmail uses verified domain (euroconnectbg.com)
+      if (configFromEmail && configFromEmail.includes('@euroconnect.eu')) {
+        console.warn('⚠️ Auto-correcting unverified domain @euroconnect.eu to @euroconnectbg.com');
+        configFromEmail = configFromEmail.replace('@euroconnect.eu', '@euroconnectbg.com');
+      }
+      
+      fromEmail = `${emailConfig.fromName} <${configFromEmail}>`;
+      console.log('Using Resend API key from Admin Panel configuration');
+    } else {
+      // Fallback to environment variable
+      resendApiKey = Deno.env.get('RESEND_API_KEY');
+      if (resendApiKey) {
+        console.log('Using Resend API key from environment variable');
+      }
+    }
+    
+    if (resendApiKey) {
+      console.log('Sending email via Resend...');
+      
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [params.to],
+          subject: params.subject,
+          html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #0E395C; padding: 20px; text-align: center;">
+              <h1 style="color: #F2C230; margin: 0;">EuroConnect Europe</h1>
+            </div>
+            <div style="padding: 20px; background-color: #f9f9f9;">
+              ${params.body.replace(/\n/g, '<br>')}
+            </div>
+            <div style="padding: 15px; background-color: #0E395C; text-align: center; color: white; font-size: 12px;">
+              <p style="margin: 0;">© 2025 EuroConnect Europe. Sva prava zadržana.</p>
+            </div>
+          </div>`,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        console.error('Resend API error:', result);
+        throw new Error(`Resend API error: ${JSON.stringify(result)}`);
+      }
+      
+      console.log('✅ Email sent successfully via Resend:', result.id);
+      
+      // Store email log in KV for tracking
+      await kv.set(`email:${emailId}`, {
+        id: emailId,
+        to: params.to,
+        subject: params.subject,
+        body: params.body,
+        sentAt: new Date().toISOString(),
+        provider: 'resend',
+        resendId: result.id,
+        status: 'sent'
+      });
+      
+      return { success: true, emailId, resendId: result.id };
+    } else {
+      console.warn('⚠️ Resend API key not configured - email will not be sent');
+      console.warn('   Configure it in Admin Panel > Settings > Email Notifikacije or set RESEND_API_KEY env var');
+      
+      // Store email log in KV for tracking (but not sent)
+      await kv.set(`email:${emailId}`, {
+        id: emailId,
+        to: params.to,
+        subject: params.subject,
+        body: params.body,
+        sentAt: new Date().toISOString(),
+        provider: 'none',
+        status: 'not_sent_no_api_key'
+      });
+      
+      return { success: false, emailId, error: 'Resend API key not configured' };
+    }
+  } catch (error) {
+    console.error('❌ Email sending failed:', error);
+    
+    // Store failed email log
+    await kv.set(`email:${emailId}`, {
+      id: emailId,
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      sentAt: new Date().toISOString(),
+      provider: 'resend',
+      status: 'failed',
+      error: String(error)
+    });
+    
+    return { success: false, emailId, error: String(error) };
+  }
 }
 
 // ==================== AUTH ROUTES ====================
@@ -270,6 +392,167 @@ app.post("/make-server-fe64975a/auth/login", async (c) => {
   } catch (error) {
     console.error('Login error:', error);
     return c.json({ error: 'Login failed' }, 500);
+  }
+});
+
+// Forgot Password - Generate reset token
+app.post("/make-server-fe64975a/auth/forgot-password", async (c) => {
+  try {
+    const { email } = await c.req.json();
+    
+    if (!email) {
+      return c.json({ error: 'Email je obavezan' }, 400);
+    }
+    
+    console.log(`🔑 Forgot password request for: ${email}`);
+    
+    // Find user by email
+    console.log('🔍 Searching for user in KV...');
+    const allUsers = await kv.getByPrefix('user:');
+    console.log(`📊 Found ${allUsers.length} total users in system`);
+    
+    const user = allUsers.find((u: any) => u.email === email);
+    console.log(`🔎 User search result:`, user ? `Found ${user.name}` : 'Not found');
+    
+    if (!user) {
+      console.log(`⚠️ User not found for email: ${email}`);
+      // For testing purposes, generate token anyway
+      const resetToken = crypto.randomUUID();
+      console.log(`🎫 Generated test token for non-existent user: ${resetToken}`);
+      return c.json({ 
+        message: 'Ako email postoji, reset link će biti poslat.',
+        resetToken // Return token for testing even if user doesn't exist
+      });
+    }
+    
+    console.log(`✅ User found: ${user.name} (ID: ${user.id})`);
+    
+    // Generate reset token
+    const resetToken = crypto.randomUUID();
+    const resetExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+    
+    console.log(`🎫 Generated reset token: ${resetToken}`);
+    console.log(`⏰ Token expires at: ${resetExpiry.toISOString()}`);
+    
+    // Store reset token
+    await kv.set(`reset:${resetToken}`, {
+      userId: user.id,
+      email: user.email,
+      expiresAt: resetExpiry.toISOString(),
+      createdAt: new Date().toISOString(),
+    });
+    
+    console.log(`💾 Reset token stored successfully in KV for ${email}`);
+    
+    // Try to send email if configured
+    const emailConfig = await kv.get('email_config');
+    
+    if (emailConfig?.enabled) {
+      // Use configured App URL if available, otherwise fall back to request origin
+      const appUrl = emailConfig.appUrl || c.req.header('origin') || 'https://your-app.com';
+      const resetUrl = `${appUrl}?reset-token=${resetToken}`;
+      
+      console.log(`📧 Generating reset URL with appUrl: ${appUrl}`);
+      console.log(`🔗 Full reset URL: ${resetUrl}`);
+      
+      const emailResult = await sendEmailNotification({
+        to: email,
+        subject: '🔐 Reset Lozinke - EuroConnect Europe',
+        body: `Poštovani ${user.name},\n\nPrimili smo zahtev za reset vaše lozinke.\n\nKliknite na link ispod da resetujete lozinku:\n${resetUrl}\n\nLink važi 1 sat.\n\nAko niste tražili reset lozinke, ignorišite ovaj email.\n\nSrdačan pozdrav,\nEuroConnect Europe Tim`
+      });
+      
+      if (emailResult.success) {
+        console.log('📧 Reset email sent successfully');
+      } else {
+        console.warn('⚠️ Failed to send reset email:', emailResult.error);
+      }
+    } else {
+      console.warn('⚠️ Email not configured - reset link not sent');
+    }
+    
+    // Return token for testing purposes (in production, don't return this!)
+    console.log(`✅ Forgot password completed successfully for ${email}`);
+    console.log(`🔗 Reset token: ${resetToken}`);
+    
+    return c.json({ 
+      message: 'Reset link je poslat na vaš email',
+      resetToken // Return token so frontend can test
+    });
+    
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    return c.json({ error: `Greška pri kreiranju reset linka: ${String(error)}` }, 500);
+  }
+});
+
+// Reset Password - Use token to reset password
+app.post("/make-server-fe64975a/auth/reset-password", async (c) => {
+  try {
+    const body = await c.req.json();
+    const resetToken = body.resetToken || body.token; // Support both field names
+    const newPassword = body.newPassword;
+    
+    console.log('📦 Reset password request:', { hasResetToken: !!body.resetToken, hasToken: !!body.token, hasPassword: !!newPassword });
+    
+    if (!resetToken || !newPassword) {
+      return c.json({ error: 'Token i nova lozinka su obavezni' }, 400);
+    }
+    
+    if (newPassword.length < 6) {
+      return c.json({ error: 'Lozinka mora imati najmanje 6 karaktera' }, 400);
+    }
+    
+    console.log(`🔐 Reset password attempt with token: ${resetToken}`);
+    
+    // Get reset token data
+    const resetData = await kv.get(`reset:${resetToken}`);
+    
+    if (!resetData) {
+      console.error('❌ Invalid or expired reset token');
+      return c.json({ error: 'Nevažeći ili istekao reset token' }, 400);
+    }
+    
+    // Check if token expired
+    if (new Date(resetData.expiresAt) < new Date()) {
+      console.error('❌ Reset token expired');
+      await kv.del(`reset:${resetToken}`); // Clean up expired token
+      return c.json({ error: 'Reset token je istekao. Zatražite novi.' }, 400);
+    }
+    
+    // Update password in Supabase Auth
+    const { error } = await supabase.auth.admin.updateUserById(
+      resetData.userId,
+      { password: newPassword }
+    );
+    
+    if (error) {
+      console.error('❌ Failed to update password:', error);
+      return c.json({ error: 'Greška pri promeni lozinke' }, 500);
+    }
+    
+    // Delete used token
+    await kv.del(`reset:${resetToken}`);
+    
+    console.log(`✅ Password reset successful for user: ${resetData.email}`);
+    
+    // Send confirmation email if configured
+    const emailConfig = await kv.get('email_config');
+    if (emailConfig?.enabled) {
+      await sendEmailNotification({
+        to: resetData.email,
+        subject: '✅ Lozinka Uspešno Promenjena - EuroConnect Europe',
+        body: `Poštovani,\n\nVaša lozinka je uspešno promenjena.\n\nAko niste izvršili ovu promenu, odmah nas kontaktirajte.\n\nSrdačan pozdrav,\nEuroConnect Europe Tim`
+      });
+    }
+    
+    return c.json({ 
+      message: 'Lozinka je uspešno promenjena!',
+      success: true 
+    });
+    
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    return c.json({ error: 'Greška pri reset-u lozinke' }, 500);
   }
 });
 
@@ -958,6 +1241,48 @@ app.get("/make-server-fe64975a/admin/payments", verifyAuth, async (c) => {
   }
 });
 
+// Update user premium status (admin only)
+app.put("/make-server-fe64975a/admin/users/:userId/premium", verifyAuth, async (c) => {
+  try {
+    const adminId = c.get('userId');
+    const adminUser = await kv.get(`user:${adminId}`);
+    
+    if (!adminUser?.isAdmin) {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+    
+    const targetUserId = c.req.param('userId');
+    const { isPremium, premiumDays } = await c.req.json();
+    
+    const user = await kv.get(`user:${targetUserId}`);
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+    
+    user.isPremium = isPremium;
+    
+    if (isPremium && premiumDays) {
+      const premiumUntil = new Date();
+      premiumUntil.setDate(premiumUntil.getDate() + premiumDays);
+      user.premiumUntil = premiumUntil.toISOString();
+      user.premiumPlan = 'admin-granted';
+    } else if (!isPremium) {
+      user.premiumUntil = null;
+      user.premiumPlan = null;
+    }
+    
+    user.updatedAt = new Date().toISOString();
+    await kv.set(`user:${targetUserId}`, user);
+    
+    console.log(`Admin ${adminUser.email} set premium=${isPremium} for user ${user.email}`);
+    
+    return c.json({ success: true, user });
+  } catch (error) {
+    console.error('Update premium status error:', error);
+    return c.json({ error: 'Failed to update premium status' }, 500);
+  }
+});
+
 // ==================== PAYMENT CONFIG ROUTES (ADMIN ONLY) ====================
 
 // Get payment configuration (admin only)
@@ -1059,6 +1384,8 @@ app.get("/make-server-fe64975a/admin/email-config", verifyAuth, async (c) => {
     
     const config = await kv.get('email_config');
     
+    console.log('🔍 Raw email_config from DB:', JSON.stringify(config, null, 2));
+    
     if (!config) {
       return c.json({ enabled: false });
     }
@@ -1070,6 +1397,11 @@ app.get("/make-server-fe64975a/admin/email-config", verifyAuth, async (c) => {
       fromName: config.fromName,
       enabled: config.enabled,
       hasApiKey: !!config.apiKey,
+      // EmailJS specific (public key can be sent to frontend)
+      serviceId: config.serviceId || '',
+      templateId: config.templateId || '',
+      publicKey: config.publicKey || '',
+      updatedAt: config.updatedAt,
     });
   } catch (error) {
     console.error('Get email config error:', error);
@@ -1086,7 +1418,9 @@ app.post("/make-server-fe64975a/admin/email-config", verifyAuth, async (c) => {
       return c.json({ error: 'Admin access required' }, 403);
     }
     
-    const { provider, apiKey, fromEmail, fromName, enabled } = await c.req.json();
+    const { provider, apiKey, fromEmail, fromName, enabled, serviceId, templateId, publicKey } = await c.req.json();
+    
+    console.log(`📧 Saving email config: provider=${provider}, enabled=${enabled}, serviceId=${serviceId}, templateId=${templateId}, publicKey=${publicKey ? 'present' : 'missing'}`);
     
     // Get existing config to preserve API key if not provided
     let existingConfig = await kv.get('email_config');
@@ -1096,16 +1430,20 @@ app.post("/make-server-fe64975a/admin/email-config", verifyAuth, async (c) => {
     
     const config = {
       provider,
-      apiKey: apiKey || existingConfig.apiKey, // Keep existing if not provided
+      apiKey: apiKey || existingConfig.apiKey || '', // Keep existing if not provided
       fromEmail,
       fromName,
       enabled,
+      // EmailJS specific
+      serviceId: serviceId || existingConfig.serviceId || '',
+      templateId: templateId || existingConfig.templateId || '',
+      publicKey: publicKey || existingConfig.publicKey || '',
       updatedAt: new Date().toISOString(),
     };
     
     await kv.set('email_config', config);
     
-    console.log(`Email config saved by admin ${adminUser.email}: provider=${provider}, enabled=${enabled}`);
+    console.log(`✅ Email config saved by admin ${adminUser.email}: provider=${config.provider}, enabled=${config.enabled}, serviceId=${config.serviceId}`);
     
     return c.json({ success: true });
   } catch (error) {
@@ -1127,12 +1465,80 @@ app.post("/make-server-fe64975a/admin/test-email", verifyAuth, async (c) => {
     const { toEmail } = await c.req.json();
     const emailConfig = await kv.get('email_config');
     
-    if (!emailConfig || !emailConfig.enabled || !emailConfig.apiKey) {
-      return c.json({ error: 'Email nije konfigurisan' }, 400);
+    if (!emailConfig || !emailConfig.enabled) {
+      return c.json({ error: 'Email nije konfigurisan ili nije aktiviran. Prvo sačuvaj email konfiguraciju.' }, 400);
+    }
+    
+    console.log(`Attempting to send test email via ${emailConfig.provider} to ${toEmail}`);
+    
+    // Send test email using EmailJS
+    if (emailConfig.provider === 'emailjs') {
+      if (!emailConfig.serviceId || !emailConfig.templateId || !emailConfig.publicKey) {
+        return c.json({ error: 'EmailJS kredencijali nisu potpuni (Service ID, Template ID, Public Key)' }, 400);
+      }
+      
+      console.log('📧 Preparing EmailJS request...');
+      console.log(`   Service ID: ${emailConfig.serviceId}`);
+      console.log(`   Template ID: ${emailConfig.templateId}`);
+      console.log(`   Public Key: ${emailConfig.publicKey?.substring(0, 10)}...`);
+      console.log(`   To: ${toEmail}`);
+      
+      const emailData = {
+        service_id: emailConfig.serviceId,
+        template_id: emailConfig.templateId,
+        user_id: emailConfig.publicKey,
+        template_params: {
+          to_email: toEmail,
+          to_name: adminUser.name,
+          from_name: emailConfig.fromName,
+          subject: '🧪 Test Email - EuroConnect Europe',
+          message: `Ovo je test email iz EuroConnect Europe platforme. Ako si primio ovaj email, znači da email konfiguracija radi ispravno! ✅`,
+        },
+      };
+      
+      console.log('📤 Sending to EmailJS API...');
+      console.log('Request body:', JSON.stringify(emailData, null, 2));
+      
+      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailData),
+      });
+      
+      console.log(`📨 EmailJS Response Status: ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ EmailJS error response:', errorText);
+        console.error('   Status:', response.status);
+        console.error('   Status Text:', response.statusText);
+        return c.json({ 
+          error: `EmailJS greška (${response.status}): ${errorText || response.statusText}`,
+          details: errorText
+        }, 500);
+      }
+      
+      const responseData = await response.text();
+      console.log(`✅ Test email sent to ${toEmail} via EmailJS`);
+      console.log('   Response:', responseData);
+      return c.json({ success: true, message: 'Email uspešno poslat!' });
     }
     
     // Send test email using Resend
     if (emailConfig.provider === 'resend') {
+      if (!emailConfig.apiKey) {
+        return c.json({ error: 'Resend API key nije konfigurisan' }, 400);
+      }
+      
+      // Auto-fix: Ensure fromEmail uses verified domain (euroconnectbg.com)
+      let fromEmail = emailConfig.fromEmail;
+      if (fromEmail && fromEmail.includes('@euroconnect.eu')) {
+        console.warn('⚠️ Detected unverified domain @euroconnect.eu - auto-correcting to @euroconnectbg.com');
+        fromEmail = fromEmail.replace('@euroconnect.eu', '@euroconnectbg.com');
+      }
+      
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -1140,7 +1546,7 @@ app.post("/make-server-fe64975a/admin/test-email", verifyAuth, async (c) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: `${emailConfig.fromName} <${emailConfig.fromEmail}>`,
+          from: `${emailConfig.fromName} <${fromEmail}>`,
           to: [toEmail],
           subject: '🧪 Test Email - EuroConnect Europe',
           html: `
@@ -1148,7 +1554,7 @@ app.post("/make-server-fe64975a/admin/test-email", verifyAuth, async (c) => {
             <p>Ovo je test email iz EuroConnect Europe platforme.</p>
             <p>Ako si primio ovaj email, znači da email konfiguracija radi ispravno! ✅</p>
             <p><strong>Provider:</strong> ${emailConfig.provider}</p>
-            <p><strong>Od:</strong> ${emailConfig.fromEmail}</p>
+            <p><strong>Od:</strong> ${fromEmail}</p>
             <hr />
             <p><small>Poslato: ${new Date().toLocaleString('sr-RS')}</small></p>
           `,
@@ -1165,7 +1571,7 @@ app.post("/make-server-fe64975a/admin/test-email", verifyAuth, async (c) => {
       return c.json({ success: true });
     }
     
-    return c.json({ error: 'Unsupported email provider' }, 400);
+    return c.json({ error: `Unsupported email provider: ${emailConfig.provider}. Koristi 'emailjs' ili 'resend'` }, 400);
   } catch (error) {
     console.error('Send test email error:', error);
     return c.json({ error: 'Failed to send test email' }, 500);
@@ -1187,17 +1593,30 @@ app.post("/make-server-fe64975a/auth/forgot-password", async (c) => {
     const allUsers = await kv.getByPrefix('user:');
     const user = allUsers.find((u: any) => u.email === email);
     
-    if (!user) {
-      // Don't reveal if user exists or not for security reasons
-      return c.json({ 
-        success: true, 
-        message: 'Ako postoji nalog sa ovom email adresom, dobićete link za reset lozinke.' 
-      });
-    }
-    
-    // Generate reset token (valid for 1 hour)
+    // Generate reset token (valid for 1 hour) - always generate for testing
     const resetToken = crypto.randomUUID();
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    
+    if (!user) {
+      // Don't reveal if user exists or not for security reasons
+      // But still save token for admin testing purposes
+      console.log(`Reset requested for non-existent user ${email}, saving token anyway for testing: ${resetToken}`);
+      
+      // Save token even for non-existent users (admin testing)
+      await kv.set(`reset-token:${resetToken}`, {
+        userId: null,
+        email: email,
+        createdAt: new Date().toISOString(),
+        expiresAt: resetExpires.toISOString(),
+        isTestToken: true, // Mark as test token
+      });
+      
+      return c.json({ 
+        success: true, 
+        message: 'Ako postoji nalog sa ovom email adresom, dobićete link za reset lozinke.',
+        resetToken: resetToken // Include for admin testing even if user doesn't exist
+      });
+    }
     
     // Store reset token
     await kv.set(`reset-token:${resetToken}`, {
@@ -1210,10 +1629,50 @@ app.post("/make-server-fe64975a/auth/forgot-password", async (c) => {
     // Send email with reset link
     const emailConfig = await kv.get('email_config');
     
+    console.log('📧 Email Config Status:', {
+      exists: !!emailConfig,
+      enabled: emailConfig?.enabled,
+      hasApiKey: !!emailConfig?.apiKey,
+      provider: emailConfig?.provider,
+      fromEmail: emailConfig?.fromEmail,
+    });
+    
     if (emailConfig && emailConfig.enabled && emailConfig.apiKey) {
-      const resetLink = `${c.req.header('origin') || 'http://localhost:3000'}?reset-token=${resetToken}`;
+      // Try to get the origin from multiple sources in order of priority
+      let origin = c.req.header('origin') || 
+                   c.req.header('referer')?.replace(/\?.*$/, '').replace(/\/$/, '');
+      
+      // If we still don't have origin, try to get it from saved config
+      if (!origin) {
+        const appConfig = await kv.get('app_config');
+        origin = appConfig?.baseUrl || 'https://cf08c917-7c95-40f2-b849-d8ee5015aba0-figmaiframepreview.figma.site';
+      }
+      
+      console.log('🌐 Origin Detection:', {
+        fromHeader: c.req.header('origin'),
+        fromReferer: c.req.header('referer'),
+        fromConfig: (await kv.get('app_config'))?.baseUrl,
+        finalOrigin: origin,
+      });
+      
+      // Save the origin for future use if we got it from headers
+      if (c.req.header('origin') || c.req.header('referer')) {
+        await kv.set('app_config', { baseUrl: origin, updatedAt: new Date().toISOString() });
+      }
+      
+      const resetLink = `${origin}?reset-token=${resetToken}`;
+      
+      console.log(`📧 Generating password reset link: ${resetLink}`);
       
       if (emailConfig.provider === 'resend') {
+        console.log('📤 Attempting to send email via Resend...');
+        console.log('📧 Email payload:', {
+          from: `${emailConfig.fromName} <${emailConfig.fromEmail}>`,
+          to: email,
+          subject: '🔑 Reset lozinke - EuroConnect Europe',
+          resetLink: resetLink,
+        });
+        
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -1250,22 +1709,82 @@ app.post("/make-server-fe64975a/auth/forgot-password", async (c) => {
           }),
         });
         
+        console.log('📨 Resend API Response Status:', response.status);
+        
         if (!response.ok) {
-          const error = await response.text();
-          console.error('Failed to send password reset email:', error);
+          const errorText = await response.text();
+          console.error('❌ Resend API Error:', errorText);
+          console.error('❌ Failed to send password reset email via Resend');
           // Still return success to not reveal user existence
         } else {
-          console.log(`Password reset email sent to ${email}`);
+          const responseData = await response.json();
+          console.log('✅ Resend API Success:', responseData);
+          console.log(`✅ Password reset email sent to ${email} via Resend`);
         }
+      } else if (emailConfig.provider === 'sendgrid') {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${emailConfig.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{
+              to: [{ email: email }],
+              subject: '🔑 Reset lozinke - EuroConnect Europe',
+            }],
+            from: {
+              email: emailConfig.fromEmail,
+              name: emailConfig.fromName,
+            },
+            content: [{
+              type: 'text/html',
+              value: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #0E395C;">Reset lozinke</h2>
+                  <p>Pozdrav ${user.name},</p>
+                  <p>Primili smo zahtev za reset vaše lozinke na EuroConnect Europe platformi.</p>
+                  <p>Kliknite na dugme ispod da resetujete lozinku:</p>
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetLink}" 
+                       style="background-color: #F2C230; color: #0E395C; padding: 12px 30px; 
+                              text-decoration: none; border-radius: 5px; font-weight: bold; 
+                              display: inline-block;">
+                      Resetuj lozinku
+                    </a>
+                  </div>
+                  <p><strong>Link je validan 1 sat.</strong></p>
+                  <p>Ako niste zatražili reset lozinke, možete ignorisati ovaj email.</p>
+                  <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;" />
+                  <p style="color: #666; font-size: 12px;">
+                    EuroConnect Europe - Povezujemo Balkan sa EU<br/>
+                    Poslato: ${new Date().toLocaleString('sr-RS')}
+                  </p>
+                </div>
+              `,
+            }],
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.text();
+          console.error('❌ Failed to send password reset email via SendGrid:', error);
+          // Still return success to not reveal user existence
+        } else {
+          console.log(`✅ Password reset email sent to ${email} via SendGrid`);
+        }
+      } else {
+        console.log(`⚠️ Email provider '${emailConfig.provider}' not supported for server-side sending. Use Resend or SendGrid.`);
       }
     } else {
-      console.log(`Password reset requested for ${email} but email is not configured`);
+      console.log(`⚠️ Password reset requested for ${email} but email is not configured`);
       console.log(`Reset token: ${resetToken}`);
     }
     
     return c.json({ 
       success: true,
-      message: 'Ako postoji nalog sa ovom email adresom, dobićete link za reset lozinke.'
+      message: 'Ako postoji nalog sa ovom email adresom, dobićete link za reset lozinke.',
+      resetToken: resetToken // Include token for admin testing
     });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -1290,13 +1809,26 @@ app.post("/make-server-fe64975a/auth/reset-password", async (c) => {
     const resetData = await kv.get(`reset-token:${token}`);
     
     if (!resetData) {
+      console.error(`❌ Token not found in KV store: reset-token:${token}`);
       return c.json({ error: 'Nevažeći ili istekao reset link' }, 400);
     }
+    
+    console.log(`✅ Token found in KV:`, { userId: resetData.userId, email: resetData.email, isTestToken: resetData.isTestToken });
     
     // Check if token is expired
     if (new Date() > new Date(resetData.expiresAt)) {
       await kv.del(`reset-token:${token}`);
       return c.json({ error: 'Reset link je istekao. Zatražite novi.' }, 400);
+    }
+    
+    // If this is a test token (no real user), just return success
+    if (resetData.isTestToken || !resetData.userId) {
+      await kv.del(`reset-token:${token}`);
+      console.log(`✅ Test token used successfully for ${resetData.email}`);
+      return c.json({ 
+        success: true,
+        message: 'Password reset successful (test mode - no actual user)'
+      });
     }
     
     // Update password in Supabase Auth
@@ -1490,7 +2022,7 @@ app.post("/make-server-fe64975a/documents/upload", verifyAuth, async (c) => {
     await kv.set(`document:${documentId}`, document);
     
     // Send email notification to admin
-    const adminEmail = 'admin@euroconnect.eu';
+    const adminEmail = 'office@euroconnectbg.com';
     await sendEmailNotification({
       to: adminEmail,
       subject: `[EC] Novi dokument učitan – ID: ${document.candidateId} – ${user.name} (${documentType})`,
@@ -1601,7 +2133,7 @@ app.post("/make-server-fe64975a/admin/documents/:documentId/approve", verifyAuth
     
     // Notify admin
     await sendEmailNotification({
-      to: 'admin@euroconnect.eu',
+      to: 'office@euroconnectbg.com',
       subject: `[EC] Dokument odobren – ID: ${document.candidateId} – ${candidate?.name} (${document.documentType})`,
       body: `
         Kandidat: ${candidate?.name}
@@ -1636,7 +2168,7 @@ app.post("/make-server-fe64975a/admin/documents/:documentId/approve", verifyAuth
         });
         
         await sendEmailNotification({
-          to: 'admin@euroconnect.eu',
+          to: 'office@euroconnectbg.com',
           subject: `[EC] Profil kompletiran – ID: ${document.candidateId} – ${candidate.name}`,
           body: `
             Kandidat: ${candidate.name}
@@ -1716,7 +2248,7 @@ app.post("/make-server-fe64975a/admin/documents/:documentId/reject", verifyAuth,
     
     // Notify admin
     await sendEmailNotification({
-      to: 'admin@euroconnect.eu',
+      to: 'office@euroconnectbg.com',
       subject: `[EC] Dokument odbijen – ID: ${document.candidateId} – ${candidate?.name} (${document.documentType})`,
       body: `
         Kandidat: ${candidate?.name}

@@ -40,7 +40,7 @@ export function PremiumFeatures({ onNavigate }: PremiumFeaturesProps) {
     {
       title: 'Senior Građevinski inženjer',
       company: 'Deutsche Bau AG',
-      location: 'München, Njemačka',
+      location: 'München, Nemačka',
       salary: '€4,500-5,200',
       type: 'Ekskluzivno',
       benefits: ['Visa podrška', 'Smještaj uključen', 'Porodični paket']

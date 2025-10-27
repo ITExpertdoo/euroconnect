@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Logo } from './Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../utils/api';
 import { toast } from 'sonner@2.0.3';
@@ -106,23 +107,23 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
   const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'pending':
-        return { label: 'Sent', color: 'bg-gray-100 text-gray-800' };
+        return { label: 'Poslato', color: 'bg-gray-100 text-gray-800' };
       case 'reviewed':
-        return { label: 'Seen', color: 'bg-yellow-100 text-yellow-800' };
+        return { label: 'Pregledano', color: 'bg-yellow-100 text-yellow-800' };
       case 'accepted':
-        return { label: 'Offer', color: 'bg-green-100 text-green-800' };
+        return { label: 'Prihvaćeno', color: 'bg-green-100 text-green-800' };
       case 'rejected':
-        return { label: 'Rejected', color: 'bg-red-100 text-red-800' };
+        return { label: 'Odbijeno', color: 'bg-red-100 text-red-800' };
       default:
         return { label: status, color: 'bg-gray-100 text-gray-800' };
     }
   };
 
   const handleFileUpload = (index: number, file: File) => {
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    // Validate file type - SAMO PDF!
+    const allowedTypes = ['application/pdf'];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Nevalidan format! Dozvoljeni formati su: PDF, JPG, PNG');
+      toast.error('Nevalidan format! Dozvoljen je samo PDF format.');
       return;
     }
     
@@ -151,14 +152,14 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
   };
 
   const sidebarItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'browse-jobs', icon: Briefcase, label: 'Pretraži Poslove' },
-    { id: 'applications', icon: FileText, label: 'My Applications', count: applications.length },
-    { id: 'saved', icon: Bookmark, label: 'Saved Jobs', count: 0 },
-    { id: 'messages', icon: MessageSquare, label: 'Messages', count: 0 },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Kontrolna tabla' },
+    { id: 'browse-jobs', icon: Briefcase, label: 'Pretraži poslove' },
+    { id: 'applications', icon: FileText, label: 'Moje aplikacije', count: applications.length },
+    { id: 'saved', icon: Bookmark, label: 'Sačuvani poslovi', count: 0 },
+    { id: 'messages', icon: MessageSquare, label: 'Poruke', count: 0 },
     { id: 'documents', icon: Upload, label: 'Moja dokumenta' },
-    { id: 'checklist', icon: CheckCircle, label: 'Checklist' },
-    { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'checklist', icon: CheckCircle, label: 'Kontrolna lista' },
+    { id: 'settings', icon: Settings, label: 'Podešavanja' },
   ];
 
   const savedJobs: any[] = [];
@@ -179,14 +180,51 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
   };
 
   const renderBrowseJobs = () => {
-    const filteredJobs = jobs.filter(job => 
-      job.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.location?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Filter jobs: non-premium users can't see premium jobs
+    const filteredJobs = jobs
+      .filter(job => {
+        // Premium filter: If job is premium and user is not premium/admin, hide it
+        if (job.isPremium && !isPremium && !isAdmin) {
+          return false;
+        }
+        // Search filter
+        return (
+          job.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          job.location?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      });
 
     return (
       <div>
+        {/* DEBUG: Premium Status Info */}
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+          <p><strong>Debug Info:</strong></p>
+          <p>Premium Status: <strong className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ PREMIUM' : '❌ NOT PREMIUM'}</strong></p>
+          <p>Admin Status: <strong className={isAdmin ? 'text-gold' : 'text-gray-600'}>{isAdmin ? '👑 ADMIN' : 'Regular User'}</strong></p>
+          <p>Total Jobs: {jobs.length} | Premium Jobs: {jobs.filter(j => j.isPremium).length} | Visible Jobs: {filteredJobs.length}</p>
+        </div>
+
+        {/* Premium Notice if not premium */}
+        {!isPremium && !isAdmin && jobs.some(job => job.isPremium) && (
+          <div className="mb-6 bg-gold/10 border-2 border-gold rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <Crown className="w-6 h-6 text-gold" />
+              <div>
+                <p className="font-semibold text-gray-800">Premium oglasi su dostupni samo za premium korisnike</p>
+                <p className="text-sm text-gray-600 mt-1">Nadogradite na Premium plan da biste pristupili ekskluzivnim poslovima sa boljim uslovima.</p>
+                <Button 
+                  className="mt-3 bg-gold text-gold-foreground hover:bg-gold/90"
+                  onClick={() => onNavigate?.('premium')}
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  Postani Premium
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
@@ -283,7 +321,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Applications</p>
+                <p className="text-sm text-gray-600 mb-1">Ukupno aplikacija</p>
                 <p className="text-2xl font-bold">{applications.length}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -297,7 +335,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">In Progress</p>
+                <p className="text-sm text-gray-600 mb-1">U toku</p>
                 <p className="text-2xl font-bold">
                   {applications.filter(a => a.status === 'reviewed').length}
                 </p>
@@ -313,7 +351,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Offers</p>
+                <p className="text-sm text-gray-600 mb-1">Ponude</p>
                 <p className="text-2xl font-bold">
                   {applications.filter(a => a.status === 'accepted').length}
                 </p>
@@ -329,7 +367,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Documents</p>
+                <p className="text-sm text-gray-600 mb-1">Dokumenta</p>
                 <p className="text-2xl font-bold">{calculateDocumentProgress()}%</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
@@ -486,7 +524,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
             <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p>Još nemate aplikacija</p>
             <p className="text-sm mt-2">Pronađite poslove i aplicirajte!</p>
-            <Button className="mt-6" onClick={() => onNavigate?.('billboard')}>
+            <Button className="mt-6" onClick={() => setActiveSection('browse-jobs')}>
               Pretraži poslove
             </Button>
           </div>
@@ -544,7 +582,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
           <Bookmark className="w-16 h-16 mx-auto mb-4 opacity-50" />
           <p>Nemate sačuvanih poslova</p>
           <p className="text-sm mt-2">Sačuvajte poslove koji vas zanimaju</p>
-          <Button className="mt-6" onClick={() => onNavigate?.('billboard')}>
+          <Button className="mt-6" onClick={() => setActiveSection('browse-jobs')}>
             Pretraži poslove
           </Button>
         </div>
@@ -586,7 +624,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
             ⚠️ Važna pravila za upload dokumenata
           </h4>
           <ul className="text-sm text-yellow-800 space-y-1">
-            <li>✅ Dozvoljeni formati: <strong>PDF, JPG, PNG</strong></li>
+            <li>✅ Dozvoljeni format: <strong>SAMO PDF</strong></li>
             <li>✅ Dokumenti moraju biti <strong>skenirani u boji</strong></li>
             <li>✅ Minimalna rezolucija: <strong>200 DPI</strong></li>
             <li>❌ <strong>ZABRANJENO:</strong> Crno-beli skenovi, fotografije sa telefona, mutni fajlovi</li>
@@ -659,7 +697,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
         </div>
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-gray-700">
-            <strong>Napomena:</strong> Prihvaćeni formati: PDF, DOC, DOCX, JPG, PNG. Maksimalna veličina fajla: 10MB.
+            <strong>Napomena:</strong> Prihvaćen format: PDF. Maksimalna veličina fajla: 10MB.
           </p>
         </div>
       </CardContent>
@@ -790,12 +828,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
       <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 border-b">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate?.('landing')}>
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">EC</span>
-              </div>
-              <span className="text-sm font-semibold text-primary">EuroConnect</span>
-            </div>
+            <Logo size="sm" className="cursor-pointer" onClick={() => onNavigate?.('landing')} />
             <button className="md:hidden" onClick={() => setMobileMenuOpen(false)}>
               <X className="w-5 h-5" />
             </button>
@@ -858,14 +891,6 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps = {})
             >
               <Crown className="w-5 h-5 text-gold" />
               <span className="text-sm">Premium</span>
-            </div>
-            
-            <div 
-              className="flex items-center gap-3 p-3 rounded-lg mb-2 cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => onNavigate?.('billboard')}
-            >
-              <Eye className="w-5 h-5" />
-              <span className="text-sm">Oglasna tabla</span>
             </div>
             
             {isAdmin && (

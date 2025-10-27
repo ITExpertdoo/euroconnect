@@ -14,10 +14,10 @@ export function BillboardAds({ onNavigate }: BillboardAdsProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Horizontal ticker data
-  const tickerItems = [
-    "🔥 NOVO: 150+ novih poslova u Njemačkoj",
+  const messages = [
+    "🔥 NOVO: 150+ novih poslova u Nemačkoj",
     "⭐ Premium korisnici dobijaju 3x više odgovora",
-    "🇩🇪 Njemačka traži 500+ građevinskih radnika",
+    "🇩🇪 Nemačka traži 500+ građevinskih radnika",
     "💰 Prosječna plata u EU: €3,200/mjesec",
     "🎯 95% naših kandidata dobije ponudu u 30 dana",
     "🏆 #1 platforma za posao u EU za Balkan",
@@ -29,7 +29,7 @@ export function BillboardAds({ onNavigate }: BillboardAdsProps) {
   const banners = [
     {
       id: 1,
-      title: "Njemačka traži IT stručnjake",
+      title: "Nemačka traži IT stručnjake",
       subtitle: "Do €6,500 mjesečno + relokacija paket",
       description: "Preko 200 IT pozicija dostupno. Visa podrška uključena.",
       image: "https://images.unsplash.com/photo-1673977597037-f0373625156e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjBidWlsZGluZyUyMGV1cm9wZXxlbnwxfHx8fDE3NTgwMjk5NzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
@@ -151,7 +151,7 @@ export function BillboardAds({ onNavigate }: BillboardAdsProps) {
               </div>
               <div className="overflow-hidden">
                 <div className="animate-scroll whitespace-nowrap">
-                  {tickerItems.concat(tickerItems).map((item, index) => (
+                  {messages.concat(messages).map((item, index) => (
                     <span key={index} className="inline-block mr-12 text-sm opacity-90">
                       {item}
                     </span>
@@ -264,7 +264,7 @@ export function BillboardAds({ onNavigate }: BillboardAdsProps) {
             {
               title: "Kuhar u restoranu",
               company: "Restaurant Group Berlin",
-              location: "Berlin, Njemačka",
+              location: "Berlin, Nemačka",
               salary: "€2,800-3,200",
               highlight: "Bez iskustva",
               premium: true

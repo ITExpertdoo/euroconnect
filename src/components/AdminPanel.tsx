@@ -4,6 +4,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
+import { Logo } from './Logo';
 import { 
   Users, 
   Briefcase, 
@@ -29,12 +30,14 @@ import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { EmailConfigSection } from './EmailConfigSection';
 import { PricingConfigModal } from './PricingConfigModal';
+import { ResetPasswordModal } from './ResetPasswordModal';
 
 interface AdminPanelProps {
   onNavigate?: (page: string) => void;
+  onOpenResetModal?: (token: string) => void;
 }
 
-export function AdminPanel({ onNavigate }: AdminPanelProps) {
+export function AdminPanel({ onNavigate, onOpenResetModal }: AdminPanelProps) {
   const { isAdmin, user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
@@ -43,14 +46,24 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
   const [seeding, setSeeding] = useState(false);
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   
+  // Reset password modal state
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  
   // Email settings state
   const [emailConfig, setEmailConfig] = useState<any>(null);
   const [emailForm, setEmailForm] = useState({
     provider: 'resend',
     apiKey: '',
-    fromEmail: 'noreply@euroconnect.eu',
+    fromEmail: 'noreply@euroconnectbg.com',
     fromName: 'EuroConnect Europe',
     enabled: false,
+    // EmailJS specific
+    serviceId: '',
+    templateId: '',
+    publicKey: '',
+    // App URL for reset links
+    appUrl: '',
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
@@ -93,12 +106,25 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
     
     if (emailRes.success && emailRes.data) {
       setEmailConfig(emailRes.data);
+      
+      // Auto-fix: Replace old domain with verified domain
+      let fromEmail = emailRes.data.fromEmail || 'noreply@euroconnectbg.com';
+      if (fromEmail.includes('@euroconnect.eu')) {
+        fromEmail = fromEmail.replace('@euroconnect.eu', '@euroconnectbg.com');
+      }
+      
       setEmailForm({
         provider: emailRes.data.provider || 'resend',
         apiKey: '',
-        fromEmail: emailRes.data.fromEmail || 'noreply@euroconnect.eu',
+        fromEmail: fromEmail,
         fromName: emailRes.data.fromName || 'EuroConnect Europe',
         enabled: emailRes.data.enabled || false,
+        // EmailJS specific
+        serviceId: emailRes.data.serviceId || '',
+        templateId: emailRes.data.templateId || '',
+        publicKey: emailRes.data.publicKey || '',
+        // App URL for reset links
+        appUrl: emailRes.data.appUrl || '',
       });
     }
 
@@ -106,6 +132,17 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
   };
   
   const handleSaveEmailConfig = async () => {
+    // Validate email domain for Resend
+    if (emailForm.provider === 'resend' && emailForm.fromEmail) {
+      if (emailForm.fromEmail.includes('@euroconnect.eu')) {
+        toast.error('⚠️ Email domena @euroconnect.eu nije verifikovana. Koristi @euroconnectbg.com umesto toga!');
+        return;
+      }
+      if (!emailForm.fromEmail.includes('@euroconnectbg.com')) {
+        toast.warning('⚠️ Za Resend, preporučujemo da koristiš @euroconnectbg.com domenu koja je verifikovana.');
+      }
+    }
+    
     setSavingEmail(true);
     try {
       const result = await api.saveEmailConfig(emailForm);
@@ -126,23 +163,51 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
   };
   
   const handleTestEmail = async () => {
-    if (!user?.email) {
-      toast.error('Nema email adrese za test');
-      return;
-    }
+    // Send test email to office email instead of admin's email
+    const testEmail = 'office@euroconnectbg.com';
     
     try {
-      toast.info('Slanje test email-a...');
-      const result = await api.sendTestEmail(user.email);
+      toast.info(`Slanje test email-a na ${testEmail}...`);
+      const result = await api.sendTestEmail(testEmail);
       
       if (result.success) {
-        toast.success(`✅ Test email poslat na ${user.email}!`);
+        toast.success(`✅ Test email poslat na ${testEmail}!`);
       } else {
         toast.error(result.error || 'Greška pri slanju');
       }
     } catch (error) {
       console.error('Error sending test email:', error);
       toast.error('Greška pri slanju test email-a');
+    }
+  };
+  
+  const handleTogglePremium = async (userId: string, currentStatus: boolean, userName: string) => {
+    try {
+      const newStatus = !currentStatus;
+      toast.info(`${newStatus ? 'Dodavanje' : 'Uklanjanje'} premium statusa...`);
+      
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-fe64975a/admin/users/${userId}/premium`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isPremium: newStatus,
+          premiumDays: newStatus ? 365 : 0, // 1 godina premium
+        }),
+      });
+      
+      if (response.ok) {
+        toast.success(`✅ Premium status ${newStatus ? 'dodat' : 'uklonjen'} za ${userName}!`);
+        await fetchData(); // Refresh data
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Greška pri ažuriranju statusa');
+      }
+    } catch (error) {
+      console.error('Error toggling premium:', error);
+      toast.error('Greška pri ažuriranju premium statusa');
     }
   };
 
@@ -161,7 +226,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
         toast.success('✅ Payment konfiguracija uspešno sačuvana!');
         await fetchData();
       } else {
-        toast.error(`Greška: ${result.error || 'Nije moguće sačuvati konfiguraciju'}`);
+        toast.error(`Greška: ${result.error || 'Nije moguće sauvati konfiguraciju'}`);
       }
     } catch (error) {
       console.error('Error saving payment config:', error);
@@ -515,12 +580,13 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                         <th className="text-left p-3">Uloga</th>
                         <th className="text-left p-3">Status</th>
                         <th className="text-left p-3">Registrovan</th>
+                        <th className="text-left p-3">Akcije</th>
                       </tr>
                     </thead>
                     <tbody>
                       {users.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-gray-500">
+                          <td colSpan={6} className="p-8 text-center text-gray-500">
                             <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
                             <p>Nema korisnika u sistemu.</p>
                             <p className="text-sm mt-1">Kliknite "Kreiraj Demo Podatke" da dodate demo korisnike.</p>
@@ -553,6 +619,17 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                             </td>
                             <td className="p-3 text-sm text-gray-600">
                               {new Date(user.createdAt).toLocaleDateString('sr-RS')}
+                            </td>
+                            <td className="p-3">
+                              <Button
+                                size="sm"
+                                variant={user.isPremium ? "destructive" : "default"}
+                                onClick={() => handleTogglePremium(user.id, user.isPremium || false, user.name)}
+                                className={user.isPremium ? '' : 'bg-gold text-gold-foreground hover:bg-gold/90'}
+                              >
+                                <Crown className="w-3 h-3 mr-1" />
+                                {user.isPremium ? 'Ukloni' : 'Dodaj'} Premium
+                              </Button>
                             </td>
                           </tr>
                         ))
@@ -696,172 +773,56 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <p className="text-gray-600">Konfiguriši payment gateway i email notifikacije</p>
               </div>
 
+              {/* Warning if old config exists */}
+              {emailConfig && emailConfig.provider === 'emailjs' && emailConfig.enabled && (
+                <Card className="border-red-400 bg-red-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-red-600 mt-0.5">⚠️</div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-red-900 mb-1">
+                          EmailJS Ne Radi Sa Serverom
+                        </h4>
+                        <p className="text-sm text-red-800 mb-3">
+                          EmailJS blokira server-side pozive (samo browser). Emails neće biti poslati! 
+                        </p>
+                        <p className="text-sm text-red-800 font-medium">
+                          ✅ Prebaci se na <strong>Resend</strong> (besplatan, 3000 emailova/mesec) ili SendGrid.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Info banner if email is not configured */}
+              {(!emailConfig || !emailConfig.enabled) && (
+                <Card className="border-blue-400 bg-blue-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-blue-600 mt-0.5">💡</div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-blue-900 mb-1">
+                          Email Notifikacije Nisu Aktivne
+                        </h4>
+                        <p className="text-sm text-blue-800 mb-2">
+                          Konfiguriši Resend email servis da bi sistem automatski slao notifikacije kandidatima i poslodavcima.
+                        </p>
+                        <p className="text-sm text-blue-800 font-medium">
+                          📧 <strong>Resend</strong> je besplatan (3,000 emailova/mesec) i radi perfektno sa serverom!
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Payment Configuration Section */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b-2 border-primary">
                   <CreditCard className="w-5 h-5 text-primary" />
                   <h3 className="text-xl font-semibold text-primary">Payment Configuration</h3>
                 </div>
-                
-                {/* Current Payment Status Card */}
-                <Card className={paymentConfig?.enabled ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {paymentConfig?.enabled ? (
-                        <CheckCircle className="w-6 h-6 text-green-600" />
-                      ) : (
-                        <Settings className="w-6 h-6 text-yellow-600" />
-                      )}
-                      <div>
-                        <h3 className={`font-semibold ${paymentConfig?.enabled ? 'text-green-900' : 'text-yellow-900'}`}>
-                          {paymentConfig?.enabled ? 'Live Payment Aktivno' : 'Payment Nije Konfigurisan'}
-                        </h3>
-                        <p className={`text-sm ${paymentConfig?.enabled ? 'text-green-700' : 'text-yellow-700'}`}>
-                          {paymentConfig?.enabled 
-                            ? `Provider: ${paymentConfig.provider?.toUpperCase() || 'N/A'}` 
-                            : 'Konfiguriši payment gateway da omogućiš live plaćanja'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={paymentConfig?.enabled ? 'default' : 'secondary'} className="text-sm">
-                      {paymentConfig?.enabled ? 'Enabled' : 'Disabled'}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Configuration Form */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Gateway Konfiguracija</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    Konfiguriši Stripe ili drugi payment gateway za live plaćanja.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Provider Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Provider
-                    </label>
-                    <select
-                      value={configForm.provider}
-                      onChange={(e) => setConfigForm({ ...configForm, provider: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="stripe">Stripe</option>
-                      <option value="paypal">PayPal</option>
-                      <option value="square">Square</option>
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Izaberi payment gateway koji ćeš koristiti
-                    </p>
-                  </div>
-
-                  {/* Publishable Key */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Publishable Key (Public)
-                    </label>
-                    <Input
-                      type="text"
-                      value={configForm.publishableKey}
-                      onChange={(e) => setConfigForm({ ...configForm, publishableKey: e.target.value })}
-                      placeholder="pk_live_..."
-                      className="font-mono"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Ovaj ključ će biti vidljiv u frontend kodu
-                    </p>
-                  </div>
-
-                  {/* Secret Key */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Secret Key (Private)
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type={showSecretKey ? 'text' : 'password'}
-                        value={configForm.secretKey}
-                        onChange={(e) => setConfigForm({ ...configForm, secretKey: e.target.value })}
-                        placeholder={paymentConfig?.hasSecretKey ? '••••••••••••' : 'sk_live_...'}
-                        className="font-mono pr-12"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSecretKey(!showSecretKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                      >
-                        {showSecretKey ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {paymentConfig?.hasSecretKey 
-                        ? 'Secret key je već sačuvan. Unesi novi samo ako želiš da ga promeniš.'
-                        : 'Ovaj ključ će biti bezbedno sačuvan na serveru'
-                      }
-                    </p>
-                  </div>
-
-                  {/* Enable/Disable Toggle */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Aktiviraj Live Payment</h4>
-                      <p className="text-sm text-gray-600">
-                        Omogući korisnicima da plaćaju preko payment gateway-a
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={configForm.enabled}
-                        onChange={(e) => setConfigForm({ ...configForm, enabled: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-
-                  {/* Save Button */}
-                  <div className="pt-4 border-t">
-                    <Button
-                      onClick={handleSavePaymentConfig}
-                      disabled={savingConfig || !configForm.publishableKey}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {savingConfig ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Čuvanje...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-5 h-5 mr-2" />
-                          Sačuvaj Konfiguraciju
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Info Box */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">📘 Kako dobiti API ključeve?</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• <strong>Stripe:</strong> Poseti <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="underline">Stripe Dashboard</a></li>
-                      <li>• <strong>PayPal:</strong> Idi na <a href="https://developer.paypal.com/developer/applications" target="_blank" rel="noopener noreferrer" className="underline">PayPal Developer</a></li>
-                      <li>• <strong>Square:</strong> Kreiraj aplikaciju na <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="underline">Square Developer</a></li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
               </div>
 
               {/* Email Configuration Section */}
@@ -874,6 +835,12 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 savingEmail={savingEmail}
                 handleSaveEmailConfig={handleSaveEmailConfig}
                 handleTestEmail={handleTestEmail}
+                onOpenResetModal={(token) => {
+                  console.log('🚀 Opening reset modal with token:', token);
+                  toast.success('✅ Reset modal se otvara...');
+                  setResetToken(token);
+                  setShowResetModal(true);
+                }}
               />
             </div>
           </TabsContent>
@@ -943,6 +910,17 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
       <PricingConfigModal 
         open={pricingModalOpen}
         onClose={() => setPricingModalOpen(false)}
+      />
+      
+      {/* Reset Password Modal */}
+      <ResetPasswordModal
+        open={showResetModal}
+        onClose={() => {
+          console.log('🔒 Closing reset modal');
+          setShowResetModal(false);
+          setResetToken(null);
+        }}
+        resetToken={resetToken || ''}
       />
     </div>
   );

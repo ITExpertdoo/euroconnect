@@ -10,17 +10,22 @@ import { BackendDemo } from './components/BackendDemo';
 import { AdminPanel } from './components/AdminPanel';
 import { PricingPage } from './components/PricingPage';
 import { ResetPasswordModal } from './components/ResetPasswordModal';
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { LicensingPage } from './components/LicensingPage';
 import { DigitalDocumentationPage } from './components/DigitalDocumentationPage';
 import { InsurancePage } from './components/InsurancePage';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner@2.0.3';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { DebugPanel } from './components/DebugPanel';
 
 function AppContent() {
   const { user, isAuthenticated, loading, isAdmin } = useAuth();
   const [currentPage, setCurrentPage] = useState('landing');
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showResetPage, setShowResetPage] = useState(false);
 
   // Check for reset token in URL on mount
   useEffect(() => {
@@ -28,10 +33,13 @@ function AppContent() {
     const token = urlParams.get('reset-token');
     
     if (token) {
+      console.log('✅ Reset token detected:', token);
       setResetToken(token);
-      setShowResetModal(true);
-      // Clean up URL without reloading
+      setShowResetPage(true);
+      
+      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
+      toast.success('🔐 Loading password reset...');
     }
   }, []);
 
@@ -61,8 +69,8 @@ function AppContent() {
       return true;
     }
     
-    // Premium and Billboard are accessible to all authenticated users
-    if (page === 'premium' || page === 'billboard') {
+    // Premium is accessible to all authenticated users
+    if (page === 'premium') {
       return isAuthenticated;
     }
     
@@ -92,7 +100,10 @@ function AppContent() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'landing':
-        return <LandingPage onNavigate={setCurrentPage} />;
+        return <LandingPage onNavigate={setCurrentPage} onOpenResetModal={(token: string) => {
+          setResetToken(token);
+          setShowResetModal(true);
+        }} />;
       case 'candidate-dashboard':
         return <CandidateDashboard onNavigate={setCurrentPage} />;
       case 'employer-dashboard':
@@ -110,11 +121,40 @@ function AppContent() {
       case 'insurance':
         return <InsurancePage onNavigate={setCurrentPage} />;
       case 'backend-demo':
-        return <AdminPanel onNavigate={setCurrentPage} />;
+        return <AdminPanel 
+          onNavigate={setCurrentPage}
+          onOpenResetModal={(token: string) => {
+            console.log('🔑 App.tsx received reset token:', token);
+            setResetToken(token);
+            setShowResetModal(true);
+          }}
+        />;
       default:
-        return <LandingPage onNavigate={setCurrentPage} />;
+        return <LandingPage onNavigate={setCurrentPage} onOpenResetModal={(token: string) => {
+          setResetToken(token);
+          setShowResetModal(true);
+        }} />;
     }
   };
+
+  // If reset token detected in URL, show full-page reset form IMMEDIATELY
+  // This check MUST come BEFORE the loading check!
+  if (showResetPage && resetToken) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster />
+        <ResetPasswordPage
+          token={resetToken}
+          onSuccess={() => {
+            setShowResetPage(false);
+            setResetToken(null);
+            setCurrentPage('landing');
+            toast.success('Sada se možete prijaviti sa novom lozinkom!');
+          }}
+        />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -130,9 +170,10 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-white">
       <Toaster />
+      <DebugPanel />
       {renderCurrentPage()}
       
-      {resetToken && (
+      {resetToken && showResetModal && (
         <ResetPasswordModal
           open={showResetModal}
           onClose={() => {
@@ -148,8 +189,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

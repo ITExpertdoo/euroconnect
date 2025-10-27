@@ -279,10 +279,14 @@ class ApiClient {
 
   async saveEmailConfig(config: {
     provider: string;
-    apiKey: string;
+    apiKey?: string;
     fromEmail: string;
     fromName: string;
     enabled: boolean;
+    // EmailJS specific
+    serviceId?: string;
+    templateId?: string;
+    publicKey?: string;
   }) {
     return this.request('/admin/email-config', {
       method: 'POST',
